@@ -52,6 +52,16 @@ type InstallPrompt = Event & {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 };
+type StandaloneNavigator = Navigator & {
+  standalone?: boolean;
+};
+
+function isRunningAsInstalledApp() {
+  return (
+    window.matchMedia("(display-mode: standalone)").matches ||
+    (navigator as StandaloneNavigator).standalone === true
+  );
+}
 
 let lastReverseGeocodeAt = 0;
 
@@ -260,6 +270,7 @@ export default function Home() {
   const [includeExamples, setIncludeExamples] = useState(true);
   const [exportBusy, setExportBusy] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<InstallPrompt | null>(null);
+  const [installedApp, setInstalledApp] = useState(isRunningAsInstalledApp);
 
   useEffect(() => {
     let active = true;
@@ -289,10 +300,16 @@ export default function Home() {
       event.preventDefault();
       setInstallPrompt(event as InstallPrompt);
     };
+    const onAppInstalled = () => {
+      setInstallPrompt(null);
+      setInstalledApp(true);
+      setNotice("EntoField installed. Open it from your Home Screen.");
+    };
     updateStatus();
     window.addEventListener("online", updateStatus);
     window.addEventListener("offline", updateStatus);
     window.addEventListener("beforeinstallprompt", onInstall);
+    window.addEventListener("appinstalled", onAppInstalled);
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js").catch(() => undefined);
     }
@@ -300,6 +317,7 @@ export default function Home() {
       window.removeEventListener("online", updateStatus);
       window.removeEventListener("offline", updateStatus);
       window.removeEventListener("beforeinstallprompt", onInstall);
+      window.removeEventListener("appinstalled", onAppInstalled);
     };
   }, []);
 
@@ -808,16 +826,23 @@ export default function Home() {
   }
 
   async function installApp() {
+    if (installedApp) {
+      setNotice("EntoField is already running as an installed app.");
+      return;
+    }
     if (!installPrompt) {
       setNotice(
-        "On iPhone: Safari → Share → Add to Home Screen. On Android: browser menu → Install app.",
+        "iPhone/iPad: tap Share ↑ → Add to Home Screen. Android: browser menu → Install app. Windows/macOS Chrome or Edge: use the install icon in the address bar or browser menu.",
       );
       return;
     }
     await installPrompt.prompt();
     const choice = await installPrompt.userChoice;
     setInstallPrompt(null);
-    if (choice.outcome === "accepted") setNotice("EntoField installed.");
+    if (choice.outcome === "accepted") {
+      setInstalledApp(true);
+      setNotice("EntoField installed. Open it from your Home Screen.");
+    }
   }
 
   const entoRows = buildEntoLabelRows(
@@ -950,6 +975,7 @@ export default function Home() {
               preferences={state.preferences}
               hasExamples={state.events.some((event) => event.isExample)}
               installAvailable={Boolean(installPrompt)}
+              installed={installedApp}
               onPreferences={updatePreferences}
               onInstall={() => void installApp()}
               onBackup={downloadBackup}
@@ -984,6 +1010,9 @@ export default function Home() {
           files={eventFiles}
           editing={Boolean(editingEventId)}
           photoBusy={photoBusy}
+          installAvailable={Boolean(installPrompt)}
+          showInstallCallout={!installedApp}
+          onInstall={() => void installApp()}
           onDraft={setEventDraft}
           onFiles={addEventFiles}
           onRemoveFile={(index) =>
@@ -1521,6 +1550,7 @@ function SettingsView({
   preferences,
   hasExamples,
   installAvailable,
+  installed,
   onPreferences,
   onInstall,
   onBackup,
@@ -1530,6 +1560,7 @@ function SettingsView({
   preferences: AppState["preferences"];
   hasExamples: boolean;
   installAvailable: boolean;
+  installed: boolean;
   onPreferences: (changes: Partial<AppState["preferences"]>) => void;
   onInstall: () => void;
   onBackup: () => void;
@@ -1581,10 +1612,16 @@ function SettingsView({
             It behaves like an app, but stays a free open-source website. No app
             store account is needed.
           </p>
-          <button className="primary-button compact" onClick={onInstall}>
-            <Upload aria-hidden="true" />
-            {installAvailable ? "Install app" : "Show installation steps"}
-          </button>
+          {installed ? (
+            <p className="installation-status">
+              <Check aria-hidden="true" /> Installed on this device
+            </p>
+          ) : (
+            <button className="primary-button compact" onClick={onInstall}>
+              <Upload aria-hidden="true" />
+              {installAvailable ? "Install app" : "Show installation steps"}
+            </button>
+          )}
         </article>
 
         <article className="settings-card">
@@ -1634,6 +1671,9 @@ function EventModal({
   files,
   editing,
   photoBusy,
+  installAvailable,
+  showInstallCallout,
+  onInstall,
   onDraft,
   onFiles,
   onRemoveFile,
@@ -1646,6 +1686,9 @@ function EventModal({
   files: File[];
   editing: boolean;
   photoBusy: boolean;
+  installAvailable: boolean;
+  showInstallCallout: boolean;
+  onInstall: () => void;
   onDraft: React.Dispatch<React.SetStateAction<EventDraft>>;
   onFiles: (files: FileList | null, extract?: boolean) => void;
   onRemoveFile: (index: number) => void;
@@ -1670,6 +1713,32 @@ function EventModal({
             <X />
           </button>
         </div>
+        {showInstallCallout && !editing && (
+          <aside className="install-callout" aria-label="Install EntoField">
+            <span className="install-callout-icon" aria-hidden="true">
+              <Upload />
+            </span>
+            <div className="install-callout-copy">
+              <strong>Install EntoField before fieldwork</strong>
+              <span>
+                Add it to your Home Screen for the most reliable GPS, camera,
+                offline storage, and full-screen use.
+              </span>
+              <small>
+                iPhone/iPad: Share ↑ → Add to Home Screen · Chrome/Edge: menu ⋮ →
+                Install app
+              </small>
+            </div>
+            <button
+              type="button"
+              className="primary-button compact install-callout-button"
+              onClick={onInstall}
+            >
+              <Upload aria-hidden="true" />
+              {installAvailable ? "Install now" : "Show steps"}
+            </button>
+          </aside>
+        )}
         <form onSubmit={onSubmit}>
           <div className="quick-capture">
             <button type="button" onClick={onGps}>

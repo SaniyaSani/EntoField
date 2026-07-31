@@ -935,8 +935,23 @@ h2 {
 }
 
 .settings-card > button,
-.danger-actions {
+.danger-actions,
+.installation-status {
   margin-top: auto;
+}
+
+.installation-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--green-dark);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.installation-status svg {
+  width: 18px;
+  height: 18px;
 }
 
 .data-credits {
@@ -1003,6 +1018,62 @@ h2 {
 .modal-header h2 {
   margin-bottom: 0;
   font-size: 38px;
+}
+
+.install-callout {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  margin: -8px 0 24px;
+  border: 1px solid #d6e1b1;
+  border-radius: 18px;
+  background:
+    linear-gradient(135deg, rgba(243, 245, 229, 0.98), rgba(252, 227, 221, 0.76));
+  padding: 16px;
+}
+
+.install-callout-icon {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border-radius: 15px;
+  background: var(--white);
+  color: var(--green-dark);
+  box-shadow: 0 7px 20px rgba(59, 13, 50, 0.08);
+}
+
+.install-callout-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.install-callout-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.install-callout-copy strong {
+  font-size: 16px;
+}
+
+.install-callout-copy span {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.install-callout-copy small {
+  color: var(--green-dark);
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 1.4;
+}
+
+.install-callout-button {
+  white-space: nowrap;
 }
 
 .quick-capture {
@@ -1548,6 +1619,23 @@ h2 {
 
   .modal-header h2 {
     font-size: 31px;
+  }
+
+  .install-callout {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    margin-top: -4px;
+    padding: 15px;
+  }
+
+  .install-callout-icon {
+    width: 44px;
+    height: 44px;
+  }
+
+  .install-callout-button {
+    grid-column: 1 / -1;
+    width: 100%;
   }
 
   .quick-capture {

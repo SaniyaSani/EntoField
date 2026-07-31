@@ -16,7 +16,7 @@ or CSV.
   photographs in each specimen row, and a complete Photos index;
 - EntoLabel CSV, Darwin Core CSV, and a complete ZIP with full-resolution
   photographs;
-- installable PWA with offline support;
+- installable PWA with offline support and a field-screen installation reminder;
 - no account, server database, or paid API required for the core workflow.
 
 ## Local development

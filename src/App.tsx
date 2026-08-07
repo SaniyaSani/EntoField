@@ -247,6 +247,62 @@ function weatherDescription(code: number) {
   return "mixed conditions";
 }
 
+type PlaceDetails = {
+  locality: string;
+  region: string;
+  country: string;
+};
+
+async function lookupPlace(
+  latitude: number,
+  longitude: number,
+): Promise<PlaceDetails | null> {
+  if (!navigator.onLine) return null;
+  const now = Date.now();
+  if (now - lastReverseGeocodeAt < 1_100) return null;
+  lastReverseGeocodeAt = now;
+
+  const response = await fetch(
+    `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&zoom=14&addressdetails=1`,
+    { headers: { "Accept-Language": "en" } },
+  );
+  if (!response.ok) throw new Error("place");
+
+  const data = await response.json();
+  const address = data.address ?? {};
+  return {
+    locality:
+      [
+        address.village ||
+          address.town ||
+          address.city ||
+          address.municipality,
+        address.road,
+      ]
+        .filter(Boolean)
+        .join(", ") ||
+      data.display_name?.split(",").slice(0, 2).join(", ") ||
+      "",
+    region: address.state || address.county || "",
+    country: address.country || "",
+  };
+}
+
+async function lookupWeather(latitude: number, longitude: number) {
+  if (!navigator.onLine) throw new Error("offline");
+  const response = await fetch(
+    `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,precipitation,weather_code,wind_speed_10m`,
+  );
+  if (!response.ok) throw new Error("weather");
+  const data = await response.json();
+  const current = data.current;
+  return `${current.temperature_2m} °C, ${weatherDescription(
+    current.weather_code,
+  )}, humidity ${current.relative_humidity_2m}%, wind ${
+    current.wind_speed_10m
+  } km/h (estimated)`;
+}
+
 export default function Home() {
   const [state, setState] = useState<AppState>(initialState);
   const [hydrated, setHydrated] = useState(false);
@@ -259,6 +315,7 @@ export default function Home() {
   const [eventDraft, setEventDraft] = useState<EventDraft>(emptyEvent(""));
   const [eventFiles, setEventFiles] = useState<File[]>([]);
   const [photoBusy, setPhotoBusy] = useState(false);
+  const [quickEventBusy, setQuickEventBusy] = useState(false);
   const [specimenModal, setSpecimenModal] = useState(false);
   const [editingSpecimenId, setEditingSpecimenId] = useState<string | null>(null);
   const [specimenEventId, setSpecimenEventId] = useState("");
@@ -331,6 +388,18 @@ export default function Home() {
     () => state.specimens.reduce((sum, record) => sum + record.quantity, 0),
     [state.specimens],
   );
+  const collectorOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          state.events
+            .filter((event) => !event.isExample)
+            .map((event) => event.collector.trim())
+            .filter(Boolean),
+        ),
+      ).sort((a, b) => a.localeCompare(b)),
+    [state.events],
+  );
 
   const exportData = useMemo(() => {
     const events = includeExamples
@@ -383,35 +452,14 @@ export default function Home() {
   }
 
   async function reverseGeocode(latitude: number, longitude: number) {
-    if (!navigator.onLine) return;
-    const now = Date.now();
-    if (now - lastReverseGeocodeAt < 1_100) return;
-    lastReverseGeocodeAt = now;
     try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&zoom=14&addressdetails=1`,
-        { headers: { "Accept-Language": "en" } },
-      );
-      if (!response.ok) return;
-      const data = await response.json();
-      const address = data.address ?? {};
+      const place = await lookupPlace(latitude, longitude);
+      if (!place) return;
       setEventDraft((draft) => ({
         ...draft,
-        locality:
-          draft.locality ||
-          [
-            address.village ||
-              address.town ||
-              address.city ||
-              address.municipality,
-            address.road,
-          ]
-            .filter(Boolean)
-            .join(", ") ||
-          data.display_name?.split(",").slice(0, 2).join(", ") ||
-          "",
-        region: draft.region || address.state || address.county || "",
-        country: draft.country || address.country || "",
+        locality: draft.locality || place.locality,
+        region: draft.region || place.region,
+        country: draft.country || place.country,
       }));
     } catch {
       setNotice("GPS was saved; the place name can be added manually offline.");
@@ -522,23 +570,90 @@ export default function Home() {
     }
     try {
       setNotice("Reading weather for this position…");
-      const response = await fetch(
-        `https://api.open-meteo.com/v1/forecast?latitude=${eventDraft.latitude}&longitude=${eventDraft.longitude}&current=temperature_2m,relative_humidity_2m,precipitation,weather_code,wind_speed_10m`,
+      const weather = await lookupWeather(
+        eventDraft.latitude,
+        eventDraft.longitude,
       );
-      if (!response.ok) throw new Error("weather");
-      const data = await response.json();
-      const current = data.current;
       setEventDraft((draft) => ({
         ...draft,
-        weather: `${current.temperature_2m} °C, ${weatherDescription(
-          current.weather_code,
-        )}, humidity ${current.relative_humidity_2m}%, wind ${
-          current.wind_speed_10m
-        } km/h (estimated)`,
+        weather,
       }));
       setNotice("Estimated weather added; you can edit it after observation.");
     } catch {
       setNotice("Weather service is unavailable. Add your observation manually.");
+    }
+  }
+
+  async function createEventFromCurrentLocation() {
+    if (!navigator.geolocation) {
+      setNotice("This browser does not provide device location.");
+      return;
+    }
+
+    const capturedAt = todayParts();
+    setQuickEventBusy(true);
+    setNotice("Creating an event from your current location…");
+
+    try {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) =>
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 20_000,
+          maximumAge: 5_000,
+        }),
+      );
+      const { latitude, longitude, accuracy, altitude } = position.coords;
+      const [placeResult, weatherResult] = await Promise.allSettled([
+        lookupPlace(latitude, longitude),
+        lookupWeather(latitude, longitude),
+      ]);
+      const place =
+        placeResult.status === "fulfilled" ? placeResult.value : null;
+      const weather =
+        weatherResult.status === "fulfilled" ? weatherResult.value : "";
+      const id = eventId(state, capturedAt.date);
+      const collectingEvent: CollectingEvent = {
+        id,
+        ...capturedAt,
+        country: place?.country || "",
+        region: place?.region || "",
+        locality:
+          place?.locality || `GPS ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`,
+        latitude,
+        longitude,
+        uncertainty: accuracy ? Math.round(accuracy) : undefined,
+        altitude: altitude ?? undefined,
+        coordinateSource: "device GPS",
+        collector: state.preferences.defaultCollector.trim(),
+        method: "",
+        habitat: "",
+        host: "",
+        weather,
+        notes: "",
+        photos: [],
+        createdAt: new Date().toISOString(),
+        isExample: false,
+      };
+
+      setState((current) => ({
+        ...current,
+        events: [collectingEvent, ...current.events],
+      }));
+      setSelectedEventId(id);
+      setNotice(
+        weather
+          ? `${id} created from your location with current weather.`
+          : `${id} created from your location. Weather is unavailable; you can add it later.`,
+      );
+    } catch (error) {
+      const locationError = error as GeolocationPositionError;
+      setNotice(
+        locationError.code === 1
+          ? "Location permission was not granted. No event was created."
+          : "Your location could not be read. No event was created; try again in open sky.",
+      );
+    } finally {
+      setQuickEventBusy(false);
     }
   }
 
@@ -934,6 +1049,8 @@ export default function Home() {
                 events={state.events}
                 specimens={state.specimens}
                 onNew={openNewEvent}
+                onQuickNew={() => void createEventFromCurrentLocation()}
+                quickEventBusy={quickEventBusy}
                 onSelect={setSelectedEventId}
               />
             ))}
@@ -1008,6 +1125,7 @@ export default function Home() {
         <EventModal
           draft={eventDraft}
           files={eventFiles}
+          collectorOptions={collectorOptions}
           editing={Boolean(editingEventId)}
           photoBusy={photoBusy}
           installAvailable={Boolean(installPrompt)}
@@ -1058,11 +1176,15 @@ function EventsView({
   events,
   specimens,
   onNew,
+  onQuickNew,
+  quickEventBusy,
   onSelect,
 }: {
   events: CollectingEvent[];
   specimens: SpecimenRecord[];
   onNew: () => void;
+  onQuickNew: () => void;
+  quickEventBusy: boolean;
   onSelect: (id: string) => void;
 }) {
   return (
@@ -1072,10 +1194,24 @@ function EventsView({
           <p className="eyebrow">Field notebook</p>
           <h1 id="events-title">Collecting events</h1>
         </div>
-        <button className="primary-button" onClick={onNew}>
-          <Plus aria-hidden="true" />
-          New collecting event
-        </button>
+        <div className="title-actions">
+          <button
+            className="primary-button"
+            onClick={onQuickNew}
+            disabled={quickEventBusy}
+          >
+            <Crosshair aria-hidden="true" />
+            {quickEventBusy ? "Getting location…" : "Make event from my location"}
+          </button>
+          <button
+            className="secondary-button"
+            onClick={onNew}
+            disabled={quickEventBusy}
+          >
+            <Plus aria-hidden="true" />
+            New event manually
+          </button>
+        </div>
       </div>
 
       {!events.length ? (
@@ -1093,9 +1229,23 @@ function EventsView({
             GPS and time can be captured automatically. The same event data can
             then be inherited by one specimen, a lot, or twenty rows at once.
           </p>
-          <button className="primary-button" onClick={onNew}>
-            <Crosshair aria-hidden="true" /> Start first event
-          </button>
+          <div className="empty-state-actions">
+            <button
+              className="primary-button"
+              onClick={onQuickNew}
+              disabled={quickEventBusy}
+            >
+              <Crosshair aria-hidden="true" />
+              {quickEventBusy ? "Getting location…" : "Make event from my location"}
+            </button>
+            <button
+              className="secondary-button"
+              onClick={onNew}
+              disabled={quickEventBusy}
+            >
+              <Plus aria-hidden="true" /> New event manually
+            </button>
+          </div>
         </div>
       ) : (
         <div className="event-grid">
@@ -1669,6 +1819,7 @@ function SettingsView({
 function EventModal({
   draft,
   files,
+  collectorOptions,
   editing,
   photoBusy,
   installAvailable,
@@ -1684,6 +1835,7 @@ function EventModal({
 }: {
   draft: EventDraft;
   files: File[];
+  collectorOptions: string[];
   editing: boolean;
   photoBusy: boolean;
   installAvailable: boolean;
@@ -1854,13 +2006,20 @@ function EventModal({
               />
             </label>
             <label className="field">
-              <span>Collector *</span>
+              <span>Collector (optional)</span>
               <input
-                required
+                list="collector-history"
                 value={draft.collector}
                 onChange={(event) => patch({ collector: event.target.value })}
                 placeholder="Person(s) who collected"
               />
+              {collectorOptions.length > 0 && (
+                <datalist id="collector-history">
+                  {collectorOptions.map((collector) => (
+                    <option key={collector} value={collector} />
+                  ))}
+                </datalist>
+              )}
             </label>
             <label className="field">
               <span>Collecting method</span>

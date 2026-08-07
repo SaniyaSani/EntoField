@@ -7,9 +7,13 @@ or CSV.
 
 ## Features
 
+- one-tap collecting events from the current location, automatically recording
+  date/time, GPS, coordinate accuracy, altitude when available, locality, and
+  current weather;
 - device GPS with coordinate uncertainty;
 - EXIF GPS and capture-time extraction from photographs;
-- locality, weather, habitat, method, collector, host, and field notes;
+- locality, weather, habitat, method, optional collector, host, and field notes;
+- previously used collectors offered as reusable suggestions;
 - event and specimen photographs stored locally in IndexedDB;
 - individual specimens, lots, bulk row creation, and lot splitting;
 - EntoLabel XLSX with a clean import sheet, a Visual specimen catalog with

@@ -286,6 +286,18 @@ h2 {
   margin-bottom: 38px;
 }
 
+.title-actions,
+.empty-state-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.empty-state-actions {
+  justify-content: center;
+}
+
 .eyebrow,
 .sample-label {
   margin: 0 0 8px;
@@ -1427,6 +1439,17 @@ h2 {
   }
 
   .primary-button:not(.compact) {
+    width: 100%;
+  }
+
+  .title-actions,
+  .empty-state-actions {
+    display: grid;
+    width: 100%;
+  }
+
+  .title-actions .secondary-button,
+  .empty-state-actions .secondary-button {
     width: 100%;
   }
 

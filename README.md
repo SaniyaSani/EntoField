@@ -13,8 +13,10 @@ specimen rows.
 - creates collecting events with date/time, locality, GPS, uncertainty,
   altitude, collector, method, habitat, host/substrate, weather, notes, and
   photographs;
+- requests high-accuracy phone GPS automatically when a new event opens;
 - reads capture time and GPS from a photograph's EXIF metadata when available;
-- reads high-accuracy GPS from the phone;
+- keeps the event GPS, or requests the current phone position, when iOS provides
+  a new photograph without location metadata;
 - optionally resolves coordinates to a place name through OpenStreetMap
   Nominatim;
 - optionally adds editable current-weather estimates from Open-Meteo;
@@ -98,11 +100,15 @@ EntoLabel workflow.
 ## Browser support
 
 Use a current version of Safari on iPhone or Chrome on Android. Device location
-and PWA installation require HTTPS outside local development.
+and PWA installation require HTTPS outside local development. If location was
+previously denied, allow it in the website's settings and tap **Try GPS again**;
+a website cannot override a phone-level denial.
 
 Some messaging apps remove EXIF metadata when sending photographs. For the most
 reliable automatic location and time extraction, take the photograph inside
-EntoField or select the original camera file.
+EntoField or select the original camera file. When a selected photo has no EXIF
+GPS, EntoField labels the fallback clearly: current phone GPS is appropriate for
+a photo taken at the current site, not as the assumed location of an older photo.
 
 ## Open-source license
 

@@ -52,6 +52,8 @@ import type {
 } from "@/lib/types";
 
 type ViewName = "events" | "specimens" | "export" | "settings";
+type GpsStatus = "idle" | "requesting" | "success" | "denied" | "error";
+type GpsRequestReason = "automatic" | "manual" | "photo-fallback";
 type EventDraft = Omit<CollectingEvent, "id" | "createdAt" | "photos">;
 type TripDraft = Omit<FieldTrip, "id" | "createdAt">;
 type SpecimenDraft = Omit<
@@ -324,6 +326,7 @@ export default function Home() {
   const [eventDraft, setEventDraft] = useState<EventDraft>(emptyEvent(""));
   const [eventFiles, setEventFiles] = useState<File[]>([]);
   const [photoBusy, setPhotoBusy] = useState(false);
+  const [gpsStatus, setGpsStatus] = useState<GpsStatus>("idle");
   const [specimenModal, setSpecimenModal] = useState(false);
   const [editingSpecimenId, setEditingSpecimenId] = useState<string | null>(null);
   const [specimenEventId, setSpecimenEventId] = useState("");
@@ -491,6 +494,7 @@ export default function Home() {
 
   function openNewEvent(fieldTripId?: string) {
     setEditingEventId(null);
+    setGpsStatus("idle");
     setEventDraft({
       ...emptyEvent(state.preferences.defaultCollector),
       tripId:
@@ -500,10 +504,16 @@ export default function Home() {
     });
     setEventFiles([]);
     setEventModal(true);
+    void captureGps("automatic");
   }
 
   function openEditEvent(event: CollectingEvent) {
     setEditingEventId(event.id);
+    setGpsStatus(
+      typeof event.latitude === "number" && typeof event.longitude === "number"
+        ? "success"
+        : "idle",
+    );
     setEventDraft({
       date: event.date,
       time: event.time,
@@ -564,34 +574,61 @@ export default function Home() {
     }
   }
 
-  function captureGps() {
-    if (!navigator.geolocation) {
-      setNotice("This browser does not provide device location.");
-      return;
+  function captureGps(
+    reason: GpsRequestReason = "manual",
+  ): Promise<GeolocationPosition | null> {
+    if (!window.isSecureContext) {
+      setGpsStatus("error");
+      setNotice("Phone GPS requires the secure HTTPS version of EntoField.");
+      return Promise.resolve(null);
     }
+    if (!navigator.geolocation) {
+      setGpsStatus("error");
+      setNotice("This browser does not provide device location.");
+      return Promise.resolve(null);
+    }
+    setGpsStatus("requesting");
     setNotice("Finding a high-accuracy position…");
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude, accuracy, altitude } = position.coords;
-        setEventDraft((draft) => ({
-          ...draft,
-          latitude,
-          longitude,
-          uncertainty: accuracy ? Math.round(accuracy) : undefined,
-          altitude: altitude ?? draft.altitude,
-          coordinateSource: "device GPS",
-        }));
-        setNotice("GPS position added to the collecting event.");
-        void reverseGeocode(latitude, longitude);
-      },
-      (error) =>
-        setNotice(
-          error.code === 1
-            ? "Location permission was not granted. You can enter coordinates manually."
-            : "GPS is unavailable here. Try again in open sky or enter coordinates.",
-        ),
-      { enableHighAccuracy: true, timeout: 20_000, maximumAge: 5_000 },
-    );
+    return new Promise((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude, accuracy, altitude } = position.coords;
+          setEventDraft((draft) => ({
+            ...draft,
+            latitude,
+            longitude,
+            uncertainty: Number.isFinite(accuracy)
+              ? Math.round(accuracy)
+              : undefined,
+            altitude: altitude ?? draft.altitude,
+            coordinateSource: "device GPS",
+          }));
+          setGpsStatus("success");
+          setNotice(
+            reason === "automatic"
+              ? "GPS position added automatically."
+              : "GPS position added to the collecting event.",
+          );
+          void reverseGeocode(latitude, longitude);
+          resolve(position);
+        },
+        (error) => {
+          if (error.code === error.PERMISSION_DENIED) {
+            setGpsStatus("denied");
+            setNotice(
+              "Location is blocked. Allow it in the EntoField website settings, then tap Try GPS again.",
+            );
+          } else {
+            setGpsStatus("error");
+            setNotice(
+              "GPS is unavailable here. Try again in open sky or enter coordinates.",
+            );
+          }
+          resolve(null);
+        },
+        { enableHighAccuracy: true, timeout: 20_000, maximumAge: 5_000 },
+      );
+    });
   }
 
   async function extractPhotoData(file: File) {
@@ -604,13 +641,24 @@ export default function Home() {
         tiff: true,
       });
       const captured = data?.DateTimeOriginal || data?.CreateDate;
+      const hasCapturedAt =
+        captured instanceof Date && !Number.isNaN(captured.getTime());
       const latitude = data?.latitude;
       const longitude = data?.longitude;
       const altitude = data?.GPSAltitude;
+      const uncertainty = data?.GPSHPositioningError;
+      const hasPhotoGps =
+        typeof latitude === "number" &&
+        Number.isFinite(latitude) &&
+        typeof longitude === "number" &&
+        Number.isFinite(longitude);
+      const hasCurrentGps =
+        typeof eventDraft.latitude === "number" &&
+        typeof eventDraft.longitude === "number";
 
       setEventDraft((draft) => {
         const next = { ...draft };
-        if (captured instanceof Date && !Number.isNaN(captured.getTime())) {
+        if (hasCapturedAt) {
           const local = new Date(
             captured.getTime() - captured.getTimezoneOffset() * 60_000,
           )
@@ -619,27 +667,70 @@ export default function Home() {
           next.date = local.slice(0, 10);
           next.time = local.slice(11, 16);
         }
-        if (typeof latitude === "number" && typeof longitude === "number") {
+        if (hasPhotoGps) {
           next.latitude = latitude;
           next.longitude = longitude;
           next.coordinateSource = "photo EXIF";
+          if (typeof uncertainty === "number" && Number.isFinite(uncertainty)) {
+            next.uncertainty = Math.round(uncertainty);
+          }
         }
         if (typeof altitude === "number") next.altitude = altitude;
         return next;
       });
 
-      if (typeof latitude === "number" && typeof longitude === "number") {
-        setNotice("Photo GPS and capture time were added automatically.");
-        void reverseGeocode(latitude, longitude);
-      } else if (captured) {
-        setNotice("Photo time was added. This photo does not contain GPS data.");
-      } else {
+      if (hasPhotoGps) {
+        setGpsStatus("success");
         setNotice(
-          "Photo attached. It contains no readable GPS or capture-time metadata.",
+          hasCapturedAt
+            ? "Photo GPS and capture time were added automatically."
+            : "Photo GPS was added automatically. Its capture time was unavailable.",
         );
+        void reverseGeocode(latitude, longitude);
+      } else if (hasCurrentGps) {
+        setNotice(
+          hasCapturedAt
+            ? "Photo time was added. The photo has no GPS, so the event's current GPS was kept."
+            : "The photo has no readable metadata. The event's current GPS was kept.",
+        );
+      } else if (gpsStatus === "requesting") {
+        setNotice(
+          "The photo has no GPS. Waiting for the phone position already being requested…",
+        );
+      } else {
+        setNotice("The photo has no GPS. Requesting the phone's current position…");
+        const position = await captureGps("photo-fallback");
+        if (position) {
+          setNotice(
+            hasCapturedAt
+              ? "Photo time was added. Current phone GPS was used because the photo had no GPS."
+              : "Current phone GPS was added because the photo contained no GPS. Use it only if the photo was taken here.",
+          );
+        }
       }
     } catch {
-      setNotice("Photo attached, but its metadata could not be read.");
+      const hasCurrentGps =
+        typeof eventDraft.latitude === "number" &&
+        typeof eventDraft.longitude === "number";
+      if (hasCurrentGps) {
+        setNotice(
+          "Photo attached. Its metadata could not be read, so the event's current GPS was kept.",
+        );
+      } else if (gpsStatus === "requesting") {
+        setNotice(
+          "Photo attached without readable metadata. Waiting for the phone GPS already being requested…",
+        );
+      } else {
+        setNotice(
+          "Photo metadata could not be read. Requesting the phone's current position…",
+        );
+        const position = await captureGps("photo-fallback");
+        if (position) {
+          setNotice(
+            "Current phone GPS was added because the photo metadata was unavailable. Use it only if the photo was taken here.",
+          );
+        }
+      }
     } finally {
       setPhotoBusy(false);
     }
@@ -1159,12 +1250,13 @@ export default function Home() {
           files={eventFiles}
           editing={Boolean(editingEventId)}
           photoBusy={photoBusy}
+          gpsStatus={gpsStatus}
           onDraft={setEventDraft}
           onFiles={addEventFiles}
           onRemoveFile={(index) =>
             setEventFiles((files) => files.filter((_, item) => item !== index))
           }
-          onGps={captureGps}
+          onGps={() => void captureGps("manual")}
           onWeather={() => void fetchWeather()}
           onSubmit={(event) => void submitEvent(event)}
           onClose={() => setEventModal(false)}
@@ -2434,6 +2526,7 @@ function EventModal({
   files,
   editing,
   photoBusy,
+  gpsStatus,
   onDraft,
   onFiles,
   onRemoveFile,
@@ -2446,6 +2539,7 @@ function EventModal({
   files: File[];
   editing: boolean;
   photoBusy: boolean;
+  gpsStatus: GpsStatus;
   onDraft: React.Dispatch<React.SetStateAction<EventDraft>>;
   onFiles: (files: FileList | null, extract?: boolean) => void;
   onRemoveFile: (index: number) => void;
@@ -2472,15 +2566,30 @@ function EventModal({
         </div>
         <form onSubmit={onSubmit}>
           <div className="quick-capture">
-            <button type="button" onClick={onGps}>
+            <button
+              type="button"
+              onClick={onGps}
+              disabled={gpsStatus === "requesting"}
+              className={gpsStatus === "success" ? "is-success" : undefined}
+            >
               <Crosshair aria-hidden="true" />
-              <strong>Use phone GPS</strong>
-              <span>coordinates + accuracy</span>
+              <strong>
+                {gpsStatus === "requesting"
+                  ? "Finding GPS…"
+                  : gpsStatus === "success"
+                    ? "GPS added"
+                    : "Use phone GPS"}
+              </strong>
+              <span>
+                {gpsStatus === "requesting"
+                  ? "waiting for permission + position"
+                  : "coordinates + accuracy"}
+              </span>
             </button>
             <label>
               <Camera aria-hidden="true" />
               <strong>{photoBusy ? "Reading photo…" : "Create from photo"}</strong>
-              <span>EXIF GPS + date/time</span>
+              <span>EXIF GPS; phone GPS for new photos</span>
               <input
                 type="file"
                 accept="image/*"
@@ -2495,6 +2604,38 @@ function EventModal({
               <span>free estimate, editable</span>
             </button>
           </div>
+
+          {gpsStatus === "denied" && (
+            <div className="gps-help" role="status">
+              <div>
+                <strong>Location is blocked for EntoField.</strong>
+                <p>
+                  On iPhone Safari: open the Page menu, choose More → Website
+                  Settings → Location, then Allow or Ask. For an installed app,
+                  also check Settings → Privacy &amp; Security → Location Services
+                  and turn on Precise Location.
+                </p>
+              </div>
+              <button type="button" className="secondary-button" onClick={onGps}>
+                Try GPS again
+              </button>
+            </div>
+          )}
+
+          {gpsStatus === "error" && (
+            <div className="gps-help" role="status">
+              <div>
+                <strong>GPS is not available yet.</strong>
+                <p>
+                  Open the HTTPS version of EntoField, check Location Services,
+                  then try again outdoors or enter coordinates manually.
+                </p>
+              </div>
+              <button type="button" className="secondary-button" onClick={onGps}>
+                Try GPS again
+              </button>
+            </div>
+          )}
 
           <div className="form-grid">
             <label className="field">

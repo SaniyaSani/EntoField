@@ -95,6 +95,7 @@ const exampleTrip: FieldTrip = {
 const exampleEvent: CollectingEvent = {
   id: "EF-20260730-003",
   tripId: exampleTrip.id,
+  name: "Meadow edge sweep",
   date: "2026-07-30",
   time: "14:37",
   country: "Switzerland",
@@ -148,12 +149,27 @@ const exampleSpecimens: SpecimenRecord[] = [
 ];
 
 const initialState: AppState = {
-  schemaVersion: 2,
+  schemaVersion: 3,
   trips: [exampleTrip],
   events: [exampleEvent],
   specimens: exampleSpecimens,
-  preferences: { defaultCollector: "", idPrefix: "EF" },
+  preferences: { defaultCollector: "", recentCollectors: [], idPrefix: "EF" },
 };
+
+function recentCollectorList(values: Array<string | undefined>): string[] {
+  const seen = new Set<string>();
+  const collectors: string[] = [];
+  for (const value of values) {
+    const collector = value?.trim();
+    if (!collector) continue;
+    const key = collector.toLocaleLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    collectors.push(collector);
+    if (collectors.length >= 8) break;
+  }
+  return collectors;
+}
 
 function normalizeState(stored: Partial<AppState> & { schemaVersion?: number }): AppState {
   const storedEvents = Array.isArray(stored.events) ? stored.events : [];
@@ -162,17 +178,30 @@ function normalizeState(stored: Partial<AppState> & { schemaVersion?: number }):
     !storedTrips.some((trip) => trip.id === exampleTrip.id) &&
     storedEvents.some((event) => event.isExample && !event.tripId);
   const trips = needsExampleTrip ? [exampleTrip, ...storedTrips] : storedTrips;
-  const events = storedEvents.map((event) =>
-    needsExampleTrip && event.isExample && !event.tripId
-      ? { ...event, tripId: exampleTrip.id }
-      : event,
-  );
+  const events = storedEvents.map((event) => ({
+    ...event,
+    name: typeof event.name === "string" ? event.name : "",
+    ...(needsExampleTrip && event.isExample && !event.tripId
+      ? { tripId: exampleTrip.id }
+      : {}),
+  }));
+  const recentCollectors = recentCollectorList([
+    ...(Array.isArray(stored.preferences?.recentCollectors)
+      ? stored.preferences.recentCollectors
+      : []),
+    ...events.filter((event) => !event.isExample).map((event) => event.collector),
+    stored.preferences?.defaultCollector,
+  ]);
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     trips,
     events,
     specimens: Array.isArray(stored.specimens) ? stored.specimens : [],
-    preferences: stored.preferences ?? initialState.preferences,
+    preferences: {
+      ...initialState.preferences,
+      ...(stored.preferences ?? {}),
+      recentCollectors,
+    },
   };
 }
 
@@ -190,6 +219,7 @@ function emptyEvent(defaultCollector: string): EventDraft {
   return {
     ...now,
     tripId: undefined,
+    name: "",
     country: "",
     region: "",
     locality: "",
@@ -515,6 +545,7 @@ export default function Home() {
         : "idle",
     );
     setEventDraft({
+      name: event.name ?? "",
       date: event.date,
       time: event.time,
       tripId: event.tripId,
@@ -792,28 +823,51 @@ export default function Home() {
   async function submitEvent(event: React.FormEvent) {
     event.preventDefault();
     const photos = await persistFiles(eventFiles);
+    const normalizedDraft = {
+      ...eventDraft,
+      name: eventDraft.name.trim(),
+      collector: eventDraft.collector.trim(),
+    };
     if (editingEventId) {
       setState((current) => ({
         ...current,
         events: current.events.map((item) =>
           item.id === editingEventId
-            ? { ...item, ...eventDraft, photos: [...item.photos, ...photos] }
+            ? { ...item, ...normalizedDraft, photos: [...item.photos, ...photos] }
             : item,
         ),
+        preferences: normalizedDraft.collector
+          ? {
+              ...current.preferences,
+              recentCollectors: recentCollectorList([
+                normalizedDraft.collector,
+                ...current.preferences.recentCollectors,
+              ]),
+            }
+          : current.preferences,
       }));
       setNotice("Collecting event updated.");
     } else {
-      const id = eventId(state, eventDraft.date);
+      const id = eventId(state, normalizedDraft.date);
       const collectingEvent: CollectingEvent = {
-        ...eventDraft,
+        ...normalizedDraft,
         id,
-        locality: eventDraft.locality || "Unnamed field site",
+        locality: normalizedDraft.locality || "Unnamed field site",
         photos,
         createdAt: new Date().toISOString(),
       };
       setState((current) => ({
         ...current,
         events: [collectingEvent, ...current.events],
+        preferences: normalizedDraft.collector
+          ? {
+              ...current.preferences,
+              recentCollectors: recentCollectorList([
+                normalizedDraft.collector,
+                ...current.preferences.recentCollectors,
+              ]),
+            }
+          : current.preferences,
       }));
       setSelectedEventId(id);
       setNotice(`${id} created. Add specimens or a lot now.`);
@@ -1011,7 +1065,7 @@ export default function Home() {
       return;
     await clearAllData();
     setState({
-      schemaVersion: 2,
+      schemaVersion: 3,
       trips: [],
       events: [],
       specimens: [],
@@ -1248,6 +1302,7 @@ export default function Home() {
         <EventModal
           draft={eventDraft}
           files={eventFiles}
+          recentCollectors={state.preferences.recentCollectors}
           editing={Boolean(editingEventId)}
           photoBusy={photoBusy}
           gpsStatus={gpsStatus}
@@ -1588,7 +1643,8 @@ function TripView({
                   </button>
                   <div className="trip-event-copy">
                     <p>{event.id}</p>
-                    <h3>{event.locality}</h3>
+                    <h3>{event.name || event.locality}</h3>
+                    {event.name && <span>{event.locality}</span>}
                     <span>
                       {event.date} · {event.time || "time not recorded"}
                     </span>
@@ -1853,7 +1909,7 @@ function FieldMap({
             }`}
             style={{ left: point.x, top: point.y }}
             onClick={() => onSelectEvent(point.event.id)}
-            aria-label={`Point ${point.number}: ${point.event.locality}`}
+            aria-label={`Point ${point.number}: ${point.event.name || point.event.locality}`}
           >
             <span>{point.number}</span>
           </button>
@@ -1873,7 +1929,8 @@ function FieldMap({
             ×
           </button>
           <p>{selectedPoint.event.id}</p>
-          <strong>{selectedPoint.event.locality}</strong>
+          <strong>{selectedPoint.event.name || selectedPoint.event.locality}</strong>
+          {selectedPoint.event.name && <span>{selectedPoint.event.locality}</span>}
           <span>
             {selectedPoint.event.time || selectedPoint.event.date} ·{" "}
             {specimens
@@ -1966,8 +2023,9 @@ function EventDetail({
         <div>
           <p className="eyebrow">
             {event.isExample ? "Example collecting event" : "Collecting event"}
+            {event.name ? ` · ${event.id}` : ""}
           </p>
-          <h1>{event.id}</h1>
+          <h1>{event.name || event.id}</h1>
           <p className="detail-place">
             <MapPin aria-hidden="true" /> {event.locality}
           </p>
@@ -2141,7 +2199,7 @@ function SpecimensView({
                     className="inline-link"
                     onClick={() => onOpenEvent(record.eventId)}
                   >
-                    {event?.locality || record.eventId} · {event?.date}
+                    {event?.name || event?.locality || record.eventId} · {event?.date}
                   </button>
                 </div>
                 <div className="record-card-actions">
@@ -2349,7 +2407,8 @@ function SettingsView({
             />
           </label>
           <p className="form-hint">
-            New event example: {preferences.idPrefix || "EF"}-20260730-001
+            New event example: {preferences.idPrefix || "EF"}-20260730-001.
+            Collector is optional; recently used names are remembered automatically.
           </p>
         </article>
 
@@ -2524,6 +2583,7 @@ function TripModal({
 function EventModal({
   draft,
   files,
+  recentCollectors,
   editing,
   photoBusy,
   gpsStatus,
@@ -2537,6 +2597,7 @@ function EventModal({
 }: {
   draft: EventDraft;
   files: File[];
+  recentCollectors: string[];
   editing: boolean;
   photoBusy: boolean;
   gpsStatus: GpsStatus;
@@ -2638,6 +2699,14 @@ function EventModal({
           )}
 
           <div className="form-grid">
+            <label className="field span-2">
+              <span>Event name</span>
+              <input
+                value={draft.name}
+                onChange={(event) => patch({ name: event.target.value })}
+                placeholder="e.g. Night light trap – Atzmännig"
+              />
+            </label>
             <label className="field">
               <span>Date *</span>
               <input
@@ -2726,13 +2795,18 @@ function EventModal({
               />
             </label>
             <label className="field">
-              <span>Collector *</span>
+              <span>Collector (optional)</span>
               <input
-                required
+                list="recent-collectors"
                 value={draft.collector}
                 onChange={(event) => patch({ collector: event.target.value })}
-                placeholder="Person(s) who collected"
+                placeholder="Type a name or leave blank"
               />
+              <datalist id="recent-collectors">
+                {recentCollectors.map((collector) => (
+                  <option key={collector} value={collector} />
+                ))}
+              </datalist>
             </label>
             <label className="field">
               <span>Collecting method</span>
@@ -2752,6 +2826,22 @@ function EventModal({
                 <option value="rearing" />
               </datalist>
             </label>
+            {recentCollectors.length > 0 && (
+              <div className="collector-history">
+                <span>Recent collectors</span>
+                <div className="collector-history-buttons">
+                  {recentCollectors.map((collector) => (
+                    <button
+                      key={collector}
+                      type="button"
+                      onClick={() => patch({ collector })}
+                    >
+                      {collector}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <label className="field span-2">
               <span>Habitat</span>
               <input

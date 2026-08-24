@@ -1840,6 +1840,42 @@ h2 {
   padding: 12px;
 }
 
+.collector-history {
+  grid-column: span 2;
+  display: grid;
+  gap: 8px;
+  margin-top: -5px;
+}
+
+.collector-history > span {
+  color: var(--plum);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.collector-history-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.collector-history-buttons button {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--blush);
+  padding: 7px 11px;
+  color: var(--plum);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.collector-history-buttons button:hover {
+  border-color: var(--pink);
+  background: var(--white);
+}
+
 .file-chips {
   display: flex;
   flex-wrap: wrap;
@@ -2450,6 +2486,11 @@ h2 {
   .field.span-2 {
     grid-column: auto;
   }
+
+  .collector-history {
+    grid-column: auto;
+  }
+
 
   .field input,
   .field select {

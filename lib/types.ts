@@ -24,6 +24,7 @@ export type FieldTrip = {
 export type CollectingEvent = {
   id: string;
   tripId?: string;
+  name: string;
   date: string;
   time: string;
   country: string;
@@ -62,11 +63,12 @@ export type SpecimenRecord = {
 
 export type Preferences = {
   defaultCollector: string;
+  recentCollectors: string[];
   idPrefix: string;
 };
 
 export type AppState = {
-  schemaVersion: 2;
+  schemaVersion: 3;
   trips: FieldTrip[];
   events: CollectingEvent[];
   specimens: SpecimenRecord[];

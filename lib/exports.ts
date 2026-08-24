@@ -32,6 +32,7 @@ export function buildEntoLabelRows(
       {
         "Specimen ID": specimen.id,
         "Event ID": event.id,
+        "Event name": event.name,
         Country: event.country,
         Region: event.region,
         Locality: event.locality,
@@ -78,6 +79,7 @@ export function buildDarwinCoreRows(
       {
         catalogNumber: specimen.id,
         eventID: event.id,
+        eventRemarks: event.name,
         basisOfRecord: "PreservedSpecimen",
         eventDate: dateTime(event),
         country: event.country,

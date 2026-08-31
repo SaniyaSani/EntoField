@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { LabelModal, type LabelMode } from "@/app/label-modal";
 import {
   clearAllData,
   deletePhoto,
@@ -368,6 +369,10 @@ export default function Home() {
   const [includeExamples, setIncludeExamples] = useState(true);
   const [exportBusy, setExportBusy] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<InstallPrompt | null>(null);
+  const [labelModal, setLabelModal] = useState<{
+    mode: LabelMode;
+    eventId: string;
+  } | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -428,6 +433,12 @@ export default function Home() {
   const selectedSpecimens = state.specimens.filter(
     (specimen) => specimen.eventId === selectedEventId,
   );
+  const labelEvent = labelModal
+    ? state.events.find((event) => event.id === labelModal.eventId)
+    : undefined;
+  const labelRecords = labelEvent
+    ? state.specimens.filter((specimen) => specimen.eventId === labelEvent.id)
+    : [];
   const totalIndividuals = useMemo(
     () => state.specimens.reduce((sum, record) => sum + record.quantity, 0),
     [state.specimens],
@@ -1188,6 +1199,15 @@ export default function Home() {
                 onBack={() => setSelectedEventId(null)}
                 onEdit={() => openEditEvent(selectedEvent)}
                 onDelete={() => void removeEvent(selectedEvent)}
+                onCollectionLabels={() =>
+                  setLabelModal({ mode: "collection", eventId: selectedEvent.id })
+                }
+                onDeterminationLabels={() =>
+                  setLabelModal({
+                    mode: "determination",
+                    eventId: selectedEvent.id,
+                  })
+                }
                 onAddSpecimen={() =>
                   openSpecimen(selectedEvent.id, "specimen")
                 }
@@ -1331,6 +1351,17 @@ export default function Home() {
           }
           onSubmit={(event) => void submitSpecimen(event)}
           onClose={() => setSpecimenModal(false)}
+        />
+      )}
+
+      {labelModal && labelEvent && (
+        <LabelModal
+          key={`${labelModal.mode}-${labelEvent.id}`}
+          mode={labelModal.mode}
+          event={labelEvent}
+          records={labelRecords}
+          onClose={() => setLabelModal(null)}
+          onNotice={setNotice}
         />
       )}
 
@@ -1992,6 +2023,8 @@ function EventDetail({
   onBack,
   onEdit,
   onDelete,
+  onCollectionLabels,
+  onDeterminationLabels,
   onAddSpecimen,
   onAddLot,
   onAddBulk,
@@ -2007,6 +2040,8 @@ function EventDetail({
   onBack: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onCollectionLabels: () => void;
+  onDeterminationLabels: () => void;
   onAddSpecimen: () => void;
   onAddLot: () => void;
   onAddBulk: () => void;
@@ -2053,6 +2088,40 @@ function EventDetail({
           label="Photos"
           value={`${event.photos.length} attached`}
         />
+      </div>
+
+      <div className="label-action-panel">
+        <div className="label-action-icon">
+          <FileSpreadsheet aria-hidden="true" />
+        </div>
+        <div className="label-action-copy">
+          <p className="eyebrow">EntoLabel built in</p>
+          <h2>Label material from this event</h2>
+          <p>
+            Collection labels are the fast default. Create identical locality
+            copies now, or one label per recorded specimen or lot.
+          </p>
+        </div>
+        <div className="label-action-buttons">
+          <button
+            className="primary-button compact"
+            onClick={onCollectionLabels}
+          >
+            <MapPin aria-hidden="true" /> Collection labels
+          </button>
+          <button
+            className="secondary-button compact"
+            onClick={onDeterminationLabels}
+            disabled={!records.some((record) => record.scientificName.trim())}
+            title={
+              records.some((record) => record.scientificName.trim())
+                ? "Create separate determination labels"
+                : "Add a scientific name to enable determination labels"
+            }
+          >
+            <Bug aria-hidden="true" /> Determination labels
+          </button>
+        </div>
       </div>
 
       <div className="record-toolbar">

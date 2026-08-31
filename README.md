@@ -2,7 +2,8 @@
 
 EntoField is a free, open-source field notebook for **collected biological
 specimens**. It is designed to bridge the gap between a field note, a vial,
-photographs, a spreadsheet, and a final label in EntoLabel.
+photographs, a spreadsheet, and a final printed label. EntoLabel's core label
+workflow is now built directly into the phone-friendly PWA.
 
 It is intentionally not an iNaturalist competitor. The core object is a
 **collecting event** that can be inherited by one specimen, a lot, or many
@@ -24,6 +25,12 @@ specimen rows.
 - creates one specimen, a multi-individual lot, or up to 200 specimen rows at
   once;
 - splits a lot into individually numbered specimen rows;
+- creates fast collection/locality labels directly from a collecting event,
+  even before specimens have been entered;
+- creates one collection label per recorded specimen or lot, with the record ID;
+- keeps determination labels behind a separate action and includes only records
+  that already have a scientific name;
+- previews compact labels and downloads a print-ready A4 PDF entirely on-device;
 - stores event/specimen data and photographs locally in browser IndexedDB;
 - works after installation as a Progressive Web App (PWA);
 - exports EntoLabel-ready `.xlsx` and UTF-8 `.csv` tables;
@@ -36,7 +43,8 @@ The core app requires no account, database, paid API, or subscription. Records
 and photographs stay on the device where they were created.
 
 The optional place-name and weather lookups need an internet connection. GPS,
-manual data entry, local storage, specimens, lots, and exports do not.
+manual data entry, local storage, specimens, lots, label previews, and PDF
+generation do not after the PWA and its embedded fonts have been cached.
 
 Place names are provided by the public OpenStreetMap Nominatim service under
 its usage policy and ODbL attribution requirements. Requests are user-triggered,
@@ -94,6 +102,8 @@ EntoLabel workflow.
 - `app/globals.css` — responsive Field Rose visual system
 - `lib/entofield-db.ts` — device-local IndexedDB persistence
 - `lib/exports.ts` — Excel, CSV, Darwin Core, and ZIP exports
+- `lib/labels.ts` — collection/determination label data and formatting
+- `lib/labels-pdf.ts` — lazy-loaded offline A4 PDF layout and Unicode fonts
 - `lib/types.ts` — event, specimen, and photo data model
 - `public/sw.js` — offline service worker
 - `public/manifest.webmanifest` — installable PWA manifest

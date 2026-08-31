@@ -1,6 +1,6 @@
 {
   "name": "entofield",
-  "version": "0.1.0",
+  "version": "0.7.0",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
@@ -10,17 +10,19 @@
     "dev": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vite",
     "build": "vinext build",
     "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
-    "test": "npm run build && node --test tests/rendered-html.test.mjs",
+    "test": "npm run build && node --test tests/*.test.mjs",
     "validate:artifact": "bash scripts/validate-artifact.sh",
     "lint": "bash scripts/sites-env.sh -- eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "bash scripts/sites-env.sh -- drizzle-kit generate"
   },
   "dependencies": {
+    "@pdf-lib/fontkit": "^1.1.1",
     "drizzle-orm": "0.45.2",
     "exifr": "^7.1.3",
     "jszip": "^3.10.1",
     "lucide-react": "^1.28.0",
     "next": "16.2.6",
+    "pdf-lib": "^1.17.1",
     "react": "19.2.6",
     "react-dom": "19.2.6",
     "xlsx": "^0.18.5"

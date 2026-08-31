@@ -1,7 +1,7 @@
 {
   "name": "EntoField",
   "short_name": "EntoField",
-  "description": "Offline-first field notes for collected biological specimens",
+  "description": "Offline-first field notes and print-ready specimen labels",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#FFFDF7",

@@ -223,6 +223,43 @@ export function makeCollectionLabelJobs({
   }));
 }
 
+export function makeMultiEventCollectionLabelJobs({
+  events,
+  records,
+  source,
+  copiesByEvent,
+  includeIdentifier,
+  options,
+  settings,
+}: {
+  events: CollectingEvent[];
+  records: SpecimenRecord[];
+  source: "quick" | "records";
+  copiesByEvent: Record<string, number>;
+  includeIdentifier: boolean;
+  options: CollectionLabelOptions;
+  settings: LabelSettings;
+}): LabelJob[] {
+  const recordsByEvent = new Map<string, SpecimenRecord[]>();
+  for (const record of records) {
+    const eventRecords = recordsByEvent.get(record.eventId) ?? [];
+    eventRecords.push(record);
+    recordsByEvent.set(record.eventId, eventRecords);
+  }
+
+  return events.flatMap((event) =>
+    makeCollectionLabelJobs({
+      event,
+      records: recordsByEvent.get(event.id) ?? [],
+      source,
+      copies: copiesByEvent[event.id] ?? 1,
+      includeIdentifier,
+      options,
+      settings,
+    }),
+  );
+}
+
 export function makeDeterminationLabelJobs({
   records,
   options,

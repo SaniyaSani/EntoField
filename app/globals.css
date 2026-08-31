@@ -1740,6 +1740,10 @@ h2 {
   width: min(820px, 100%);
 }
 
+.trip-label-modal {
+  width: min(900px, 100%);
+}
+
 .label-purpose {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -1782,6 +1786,120 @@ h2 {
 
 .label-source-control {
   margin-bottom: 16px;
+}
+
+.trip-label-selection {
+  margin-top: 19px;
+}
+
+.trip-label-selection-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 12px;
+}
+
+.trip-label-selection-heading h3 {
+  margin: 0;
+  font-size: 21px;
+}
+
+.trip-label-selection-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.trip-label-selection-actions .text-button {
+  min-height: 36px;
+  padding: 0;
+}
+
+.trip-label-event-list {
+  display: grid;
+  max-height: 330px;
+  gap: 8px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.trip-label-event-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.65);
+  padding: 13px 14px;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease;
+}
+
+.trip-label-event-row.is-selected {
+  border-color: #bdcc86;
+  background: var(--white);
+}
+
+.trip-label-event-check {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: 11px;
+  cursor: pointer;
+}
+
+.trip-label-event-check > input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--green-dark);
+}
+
+.trip-label-event-number {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--pale-green);
+  color: var(--green-dark);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.trip-label-event-copy {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.trip-label-event-copy strong,
+.trip-label-event-copy span,
+.trip-label-event-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trip-label-event-copy span,
+.trip-label-event-copy small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.trip-label-copies {
+  width: 92px;
+}
+
+.trip-label-copies input {
+  min-height: 42px;
+}
+
+.trip-label-preview-section {
+  margin-top: 23px;
 }
 
 .label-quick-row {
@@ -2591,6 +2709,7 @@ h2 {
     width: 100%;
   }
 
+  .heading-actions .primary-button,
   .heading-actions .secondary-button,
   .record-actions .primary-button,
   .record-actions .secondary-button {
@@ -2655,6 +2774,19 @@ h2 {
 
   .label-preview-card {
     width: 100%;
+  }
+
+  .trip-label-selection-heading {
+    align-items: flex-start;
+  }
+
+  .trip-label-event-row {
+    grid-template-columns: 1fr;
+  }
+
+  .trip-label-copies {
+    width: 100%;
+    padding-left: 59px;
   }
 
   .record-actions {

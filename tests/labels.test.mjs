@@ -10,6 +10,7 @@ import {
   formatCollectionDate,
   makeCollectionLabelJobs,
   makeDeterminationLabelJobs,
+  makeMultiEventCollectionLabelJobs,
 } from "../lib/labels.ts";
 
 const event = {
@@ -64,6 +65,17 @@ const records = [
   },
 ];
 
+const secondEvent = {
+  ...event,
+  id: "EF-20260831-002",
+  name: "Forest stream",
+  locality: "Küsnacht, Schübelweiher",
+  latitude: 47.3112,
+  longitude: 8.5901,
+  altitude: 507,
+  time: "16:05",
+};
+
 test("formats compact collection metadata with Unicode locality", () => {
   assert.equal(formatCollectionDate(event.date, "roman"), "31.VIII.2026");
   const lines = buildCollectionLabelLines(event, event.id, {
@@ -97,6 +109,26 @@ test("creates one collection label per record, including one for a lot", () => {
   assert.match(jobs[1].lines[0].text, /-L01/);
 });
 
+test("combines selected collecting events without inserting page breaks", () => {
+  const jobs = makeMultiEventCollectionLabelJobs({
+    events: [event, secondEvent],
+    records,
+    source: "quick",
+    copiesByEvent: { [event.id]: 2, [secondEvent.id]: 3 },
+    includeIdentifier: true,
+    options: {
+      includeCoordinates: true,
+      shortenCollectorNames: true,
+      dateFormat: "roman",
+    },
+    settings: DEFAULT_COLLECTION_LABEL_SETTINGS,
+  });
+  assert.equal(jobs.length, 5);
+  assert.match(jobs[0].lines[0].text, new RegExp(event.id));
+  assert.match(jobs[2].lines[0].text, new RegExp(secondEvent.id));
+  assert.match(jobs[2].lines[0].text, /Schübelweiher/);
+});
+
 test("determination jobs remain separate and skip unidentified material", () => {
   const jobs = makeDeterminationLabelJobs({
     records,
@@ -126,11 +158,11 @@ test("creates a readable A4 PDF with embedded Unicode fonts", async () => {
     return new Response(bytes, { status: 200 });
   };
   try {
-    const jobs = makeCollectionLabelJobs({
-      event,
+    const jobs = makeMultiEventCollectionLabelJobs({
+      events: [event, secondEvent],
       records,
       source: "quick",
-      copies: 12,
+      copiesByEvent: { [event.id]: 12, [secondEvent.id]: 12 },
       includeIdentifier: true,
       options: {
         includeCoordinates: true,
@@ -140,8 +172,9 @@ test("creates a readable A4 PDF with embedded Unicode fonts", async () => {
       settings: DEFAULT_COLLECTION_LABEL_SETTINGS,
     });
     const { createLabelsPdf } = await import("../lib/labels-pdf.ts");
-    const result = await createLabelsPdf(jobs, "Collection labels test");
+    const result = await createLabelsPdf(jobs, "Combined field trip labels test");
     assert.equal(result.overflowCount, 0);
+    assert.equal(jobs.length, 24);
     assert.ok(result.bytes.byteLength > 5_000);
     const parsed = await PDFDocument.load(result.bytes);
     assert.equal(parsed.getPageCount(), 1);

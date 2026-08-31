@@ -30,6 +30,7 @@ import {
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { LabelModal, type LabelMode } from "@/app/label-modal";
+import { TripCollectionLabelModal } from "@/app/trip-label-modal";
 import {
   clearAllData,
   deletePhoto,
@@ -373,6 +374,7 @@ export default function Home() {
     mode: LabelMode;
     eventId: string;
   } | null>(null);
+  const [tripLabelModal, setTripLabelModal] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -439,6 +441,18 @@ export default function Home() {
   const labelRecords = labelEvent
     ? state.specimens.filter((specimen) => specimen.eventId === labelEvent.id)
     : [];
+  const tripLabelEvents = tripLabelModal
+    ? state.events.filter((event) =>
+        tripLabelModal === UNASSIGNED_TRIP
+          ? !event.tripId
+          : event.tripId === tripLabelModal,
+      )
+    : [];
+  const tripLabelName =
+    tripLabelModal === UNASSIGNED_TRIP
+      ? "Unassigned events"
+      : state.trips.find((trip) => trip.id === tripLabelModal)?.name ??
+        "Field trip";
   const totalIndividuals = useMemo(
     () => state.specimens.reduce((sum, record) => sum + record.quantity, 0),
     [state.specimens],
@@ -1228,6 +1242,7 @@ export default function Home() {
                 onSelectEvent={setSelectedEventId}
                 onEditTrip={selectedTrip ? () => openEditTrip(selectedTrip) : undefined}
                 onDeleteTrip={selectedTrip ? () => removeTrip(selectedTrip) : undefined}
+                onCollectionLabels={() => setTripLabelModal(selectedTripId)}
               />
             ) : (
               <TripsView
@@ -1361,6 +1376,18 @@ export default function Home() {
           event={labelEvent}
           records={labelRecords}
           onClose={() => setLabelModal(null)}
+          onNotice={setNotice}
+        />
+      )}
+
+      {tripLabelModal && tripLabelEvents.length > 0 && (
+        <TripCollectionLabelModal
+          key={tripLabelModal}
+          tripId={tripLabelModal}
+          tripName={tripLabelName}
+          events={tripLabelEvents}
+          records={state.specimens}
+          onClose={() => setTripLabelModal(null)}
           onNotice={setNotice}
         />
       )}
@@ -1536,6 +1563,7 @@ function TripView({
   onSelectEvent,
   onEditTrip,
   onDeleteTrip,
+  onCollectionLabels,
 }: {
   trip?: FieldTrip;
   unassigned: boolean;
@@ -1546,6 +1574,7 @@ function TripView({
   onSelectEvent: (id: string) => void;
   onEditTrip?: () => void;
   onDeleteTrip?: () => void;
+  onCollectionLabels: () => void;
 }) {
   const [focusedEventId, setFocusedEventId] = useState<string | null>(null);
   const orderedEvents = useMemo(
@@ -1590,8 +1619,21 @@ function TripView({
             <span>{individuals} individuals</span>
           </p>
         </div>
-        {!unassigned && onEditTrip && onDeleteTrip && (
-          <div className="heading-actions">
+        <div className="heading-actions">
+          <button
+            className="primary-button compact"
+            onClick={onCollectionLabels}
+            disabled={!events.length}
+            title={
+              events.length
+                ? "Choose events and combine their collection labels"
+                : "Add a collecting event before creating labels"
+            }
+          >
+            <FileSpreadsheet aria-hidden="true" /> Collection labels
+          </button>
+          {!unassigned && onEditTrip && onDeleteTrip && (
+            <>
             <button className="secondary-button compact" onClick={onEditTrip}>
               Edit trip
             </button>
@@ -1599,8 +1641,9 @@ function TripView({
               <Trash2 aria-hidden="true" />
               <span className="sr-only">Delete field trip</span>
             </button>
-          </div>
-        )}
+            </>
+          )}
+        </div>
       </div>
 
       <div className="trip-map-shell">

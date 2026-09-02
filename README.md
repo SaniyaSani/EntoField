@@ -30,6 +30,8 @@ specimen rows.
 - creates one collection label per recorded specimen or lot, with the record ID;
 - combines labels from selected collecting events in a field trip into one
   continuously filled PDF, with an adjustable copy count for every event;
+- prints collection-label coordinates as WGS84 latitude/longitude, modern Swiss
+  LV95, or legacy Swiss LV03 while retaining WGS84 in the stored event data;
 - keeps determination labels behind a separate action and includes only records
   that already have a scientific name;
 - previews compact labels and downloads a print-ready A4 PDF entirely on-device;

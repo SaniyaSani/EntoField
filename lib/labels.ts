@@ -16,8 +16,11 @@ export type LabelSettings = {
   drawBorders: boolean;
 };
 
+export type CoordinateFormat = "wgs84" | "lv95" | "lv03";
+
 export type CollectionLabelOptions = {
   includeCoordinates: boolean;
+  coordinateFormat: CoordinateFormat;
   shortenCollectorNames: boolean;
   dateFormat: "roman" | "slash" | "iso";
 };
@@ -103,7 +106,7 @@ export function formatCollectionDate(
   return `${day}.${ROMAN_MONTHS[month]}.${year}`;
 }
 
-function formatCoordinate(value: number, latitude: boolean): string {
+function formatWgs84Coordinate(value: number, latitude: boolean): string {
   const direction = latitude
     ? value >= 0
       ? "N"
@@ -112,6 +115,75 @@ function formatCoordinate(value: number, latitude: boolean): string {
       ? "E"
       : "W";
   return `${Math.abs(value).toFixed(4)}° ${direction}`;
+}
+
+function formatSwissGridValue(value: number): string {
+  return String(Math.round(value)).replace(/\B(?=(\d{3})+(?!\d))/g, "'");
+}
+
+/**
+ * Converts WGS84 latitude/longitude to the Swiss national grid using the
+ * swisstopo approximation. It is intentionally dependency-free so label
+ * previews and PDFs keep working offline in the installed PWA.
+ */
+export function wgs84ToSwissGrid(
+  latitude: number,
+  longitude: number,
+  format: Extract<CoordinateFormat, "lv95" | "lv03"> = "lv95",
+): { easting: number; northing: number } {
+  const latitudeSeconds = latitude * 3600;
+  const longitudeSeconds = longitude * 3600;
+  const latitudeAux = (latitudeSeconds - 169028.66) / 10000;
+  const longitudeAux = (longitudeSeconds - 26782.5) / 10000;
+
+  const lv03Easting =
+    600072.37 +
+    211455.93 * longitudeAux -
+    10938.51 * longitudeAux * latitudeAux -
+    0.36 * longitudeAux * latitudeAux ** 2 -
+    44.54 * longitudeAux ** 3;
+  const lv03Northing =
+    200147.07 +
+    308807.95 * latitudeAux +
+    3745.25 * longitudeAux ** 2 +
+    76.63 * latitudeAux ** 2 -
+    194.56 * longitudeAux ** 2 * latitudeAux +
+    119.79 * latitudeAux ** 3;
+
+  if (format === "lv95") {
+    return {
+      easting: lv03Easting + 2000000,
+      northing: lv03Northing + 1000000,
+    };
+  }
+  return { easting: lv03Easting, northing: lv03Northing };
+}
+
+export function formatCoordinatesForLabel(
+  latitude: number,
+  longitude: number,
+  format: CoordinateFormat,
+): string {
+  if (format === "wgs84") {
+    return `${formatWgs84Coordinate(latitude, true)}, ${formatWgs84Coordinate(
+      longitude,
+      false,
+    )}`;
+  }
+
+  const { easting, northing } = wgs84ToSwissGrid(
+    latitude,
+    longitude,
+    format,
+  );
+  if (format === "lv95") {
+    return `LV95 E ${formatSwissGridValue(easting)} / N ${formatSwissGridValue(
+      northing,
+    )}`;
+  }
+  return `LV03 y ${formatSwissGridValue(easting)} / x ${formatSwissGridValue(
+    northing,
+  )}`;
 }
 
 function appendInline(base: string, extra: string): string {
@@ -136,10 +208,11 @@ export function buildCollectionLabelLines(
     typeof event.latitude === "number" &&
     typeof event.longitude === "number"
   ) {
-    coordinates = `${formatCoordinate(event.latitude, true)}, ${formatCoordinate(
+    coordinates = formatCoordinatesForLabel(
+      event.latitude,
       event.longitude,
-      false,
-    )}`;
+      options.coordinateFormat,
+    );
   }
 
   const altitude =

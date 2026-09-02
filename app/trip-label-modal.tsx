@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import {
   DEFAULT_COLLECTION_LABEL_SETTINGS,
   makeMultiEventCollectionLabelJobs,
+  type CoordinateFormat,
   type CollectionLabelOptions,
   type LabelSettings,
 } from "@/lib/labels";
@@ -56,6 +57,8 @@ export function TripCollectionLabelModal({
   );
   const [includeIdentifier, setIncludeIdentifier] = useState(true);
   const [includeCoordinates, setIncludeCoordinates] = useState(true);
+  const [coordinateFormat, setCoordinateFormat] =
+    useState<CoordinateFormat>("wgs84");
   const [shortenNames, setShortenNames] = useState(true);
   const [dateFormat, setDateFormat] =
     useState<CollectionLabelOptions["dateFormat"]>("roman");
@@ -84,6 +87,7 @@ export function TripCollectionLabelModal({
   };
   const options: CollectionLabelOptions = {
     includeCoordinates,
+    coordinateFormat,
     shortenCollectorNames: shortenNames,
     dateFormat,
   };
@@ -339,6 +343,26 @@ export function TripCollectionLabelModal({
                 onChange={(input) => setIncludeCoordinates(input.target.checked)}
               />
               Print coordinates and altitude
+            </label>
+            <label className="field span-2">
+              <span>Coordinate system</span>
+              <select
+                value={coordinateFormat}
+                disabled={!includeCoordinates}
+                onChange={(input) =>
+                  setCoordinateFormat(input.target.value as CoordinateFormat)
+                }
+              >
+                <option value="wgs84">
+                  WGS84 — latitude / longitude (N/E)
+                </option>
+                <option value="lv95">
+                  Swiss LV95 — modern national grid
+                </option>
+                <option value="lv03">
+                  Swiss LV03 — legacy collections
+                </option>
+              </select>
             </label>
             <label className="checkbox-row label-checkbox settings-checkbox">
               <input

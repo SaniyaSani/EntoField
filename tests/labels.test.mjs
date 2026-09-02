@@ -7,6 +7,7 @@ import {
   DEFAULT_DETERMINATION_LABEL_SETTINGS,
   buildCollectionLabelLines,
   buildDeterminationLabelLines,
+  formatCoordinatesForLabel,
   formatCollectionDate,
   makeCollectionLabelJobs,
   makeDeterminationLabelJobs,
@@ -80,6 +81,7 @@ test("formats compact collection metadata with Unicode locality", () => {
   assert.equal(formatCollectionDate(event.date, "roman"), "31.VIII.2026");
   const lines = buildCollectionLabelLines(event, event.id, {
     includeCoordinates: true,
+    coordinateFormat: "wgs84",
     shortenCollectorNames: true,
     dateFormat: "roman",
   });
@@ -91,6 +93,31 @@ test("formats compact collection metadata with Unicode locality", () => {
   assert.match(lines[2].text, /leg\. S\. Sagutdinova, K\. Rothmund/);
 });
 
+test("formats WGS84, modern LV95 and legacy LV03 coordinates", () => {
+  assert.equal(
+    formatCoordinatesForLabel(event.latitude, event.longitude, "wgs84"),
+    "47.2428° N, 8.6921° E",
+  );
+  assert.equal(
+    formatCoordinatesForLabel(event.latitude, event.longitude, "lv95"),
+    "LV95 E 2'694'902 / N 1'233'190",
+  );
+  assert.equal(
+    formatCoordinatesForLabel(event.latitude, event.longitude, "lv03"),
+    "LV03 y 694'902 / x 233'190",
+  );
+});
+
+test("prints the selected Swiss grid on a collection label", () => {
+  const lines = buildCollectionLabelLines(event, event.id, {
+    includeCoordinates: true,
+    coordinateFormat: "lv95",
+    shortenCollectorNames: true,
+    dateFormat: "roman",
+  });
+  assert.equal(lines[1].text, "LV95 E 2'694'902 / N 1'233'190");
+});
+
 test("creates one collection label per record, including one for a lot", () => {
   const jobs = makeCollectionLabelJobs({
     event,
@@ -100,6 +127,7 @@ test("creates one collection label per record, including one for a lot", () => {
     includeIdentifier: true,
     options: {
       includeCoordinates: true,
+      coordinateFormat: "wgs84",
       shortenCollectorNames: true,
       dateFormat: "roman",
     },
@@ -118,6 +146,7 @@ test("combines selected collecting events without inserting page breaks", () => 
     includeIdentifier: true,
     options: {
       includeCoordinates: true,
+      coordinateFormat: "wgs84",
       shortenCollectorNames: true,
       dateFormat: "roman",
     },
@@ -166,6 +195,7 @@ test("creates a readable A4 PDF with embedded Unicode fonts", async () => {
       includeIdentifier: true,
       options: {
         includeCoordinates: true,
+        coordinateFormat: "wgs84",
         shortenCollectorNames: true,
         dateFormat: "roman",
       },
@@ -178,6 +208,27 @@ test("creates a readable A4 PDF with embedded Unicode fonts", async () => {
     assert.ok(result.bytes.byteLength > 5_000);
     const parsed = await PDFDocument.load(result.bytes);
     assert.equal(parsed.getPageCount(), 1);
+
+    const swissJobs = makeMultiEventCollectionLabelJobs({
+      events: [event, secondEvent],
+      records,
+      source: "quick",
+      copiesByEvent: { [event.id]: 12, [secondEvent.id]: 12 },
+      includeIdentifier: true,
+      options: {
+        includeCoordinates: true,
+        coordinateFormat: "lv95",
+        shortenCollectorNames: true,
+        dateFormat: "roman",
+      },
+      settings: DEFAULT_COLLECTION_LABEL_SETTINGS,
+    });
+    const swissResult = await createLabelsPdf(
+      swissJobs,
+      "Swiss LV95 field trip labels test",
+    );
+    assert.equal(swissResult.overflowCount, 0);
+    assert.equal((await PDFDocument.load(swissResult.bytes)).getPageCount(), 1);
   } finally {
     globalThis.fetch = originalFetch;
   }

@@ -3021,7 +3021,8 @@ h2 {
   --danger: #9e3349;
   --shadow: 5px 7px 0 rgba(33, 25, 23, 0.14);
   --font-display: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
-  --font-hand: "Chalkboard SE", "Marker Felt", "Bradley Hand", cursive;
+  --font-hand: ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Monaco,
+    Consolas, "Liberation Mono", monospace;
 }
 
 html {

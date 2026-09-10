@@ -1160,6 +1160,7 @@ export default function Home() {
             width={903}
             height={489}
             priority
+            unoptimized
           />
         </button>
         <nav className="navigation-list">
@@ -1205,6 +1206,7 @@ export default function Home() {
               width={903}
               height={489}
               priority
+              unoptimized
             />
           </button>
           <button
@@ -1485,6 +1487,7 @@ function TripsView({
             width={903}
             height={330}
             priority
+            unoptimized
           />
           <p className="eyebrow">Ready for an excursion</p>
           <h2>Start a trip, then add collecting points as you go.</h2>

@@ -1,4 +1,4 @@
-const CACHE_NAME = "entofield-v5-field-ink";
+const CACHE_NAME = "entofield-v7-label-type";
 const APP_SHELL = [
   "/",
   "/manifest.webmanifest",

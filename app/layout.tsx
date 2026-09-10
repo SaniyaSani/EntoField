@@ -16,9 +16,30 @@ export const metadata: Metadata = {
     "codex-preview": "development",
   },
   icons: {
-    icon: "/icon-192.png",
-    shortcut: "/icon-192.png",
-    apple: "/icon-192.png",
+    icon: [
+      {
+        url: "/entofield-favicon-v2.svg",
+        type: "image/svg+xml",
+      },
+      {
+        url: "/entofield-app-icon-v2-192.png",
+        sizes: "192x192",
+        type: "image/png",
+      },
+      {
+        url: "/entofield-app-icon-v2-512.png",
+        sizes: "512x512",
+        type: "image/png",
+      },
+    ],
+    shortcut: "/entofield-favicon-v2.svg",
+    apple: [
+      {
+        url: "/entofield-apple-touch-icon-v2.png",
+        sizes: "192x192",
+        type: "image/png",
+      },
+    ],
   },
 };
 

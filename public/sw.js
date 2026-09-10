@@ -1,11 +1,12 @@
-const CACHE_NAME = "entofield-v7-label-type";
+const CACHE_NAME = "entofield-v9-versioned-app-icon";
 const APP_SHELL = [
   "/",
   "/manifest.webmanifest",
-  "/favicon.svg",
-  "/icon-192.png",
-  "/icon-512.png",
-  "/icon-1024.png",
+  "/entofield-favicon-v2.svg",
+  "/entofield-app-icon-v2-192.png",
+  "/entofield-app-icon-v2-512.png",
+  "/entofield-app-icon-v2-1024.png",
+  "/entofield-apple-touch-icon-v2.png",
   "/brand/entofield-logo-ink.png",
   "/brand/entofield-fly-label-ink.png",
   "/fonts/DejaVuSans.ttf",

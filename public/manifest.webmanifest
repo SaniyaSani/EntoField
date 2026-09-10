@@ -1,6 +1,7 @@
 {
   "name": "EntoField",
   "short_name": "EntoField",
+  "id": "/",
   "description": "Offline-first field notes and print-ready specimen labels",
   "start_url": "/",
   "display": "standalone",
@@ -8,14 +9,22 @@
   "theme_color": "#3B0D32",
   "icons": [
     {
-      "src": "/icon-192.png",
+      "src": "/entofield-app-icon-v2-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
-      "src": "/icon-512.png",
+      "src": "/entofield-app-icon-v2-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/entofield-app-icon-v2-1024.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any"
     }
   ]
 }

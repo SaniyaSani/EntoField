@@ -2992,6 +2992,347 @@ h2 {
   }
 }
 
+/* First-run field guide --------------------------------------------------- */
+
+.tutorial-backdrop {
+  position: fixed;
+  z-index: 500;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(33, 25, 23, 0.72);
+  padding: 24px;
+}
+
+.tutorial-card {
+  position: relative;
+  display: grid;
+  overflow: hidden;
+  width: min(880px, 100%);
+  min-height: 530px;
+  grid-template-columns: minmax(280px, 0.82fr) minmax(390px, 1.18fr);
+  grid-template-rows: 1fr auto;
+  border: 3px solid var(--ink);
+  border-radius: 12px 20px 13px 18px;
+  background: var(--paper);
+  box-shadow: 10px 12px 0 var(--pink);
+}
+
+.tutorial-close {
+  position: absolute;
+  z-index: 2;
+  top: 16px;
+  right: 17px;
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  background: var(--paper);
+  box-shadow: 2px 3px 0 var(--ink);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.tutorial-close:hover {
+  background: var(--blush);
+  transform: rotate(3deg);
+}
+
+.tutorial-close svg {
+  width: 21px;
+  height: 21px;
+}
+
+.tutorial-art {
+  position: relative;
+  display: grid;
+  min-height: 100%;
+  grid-row: 1 / 3;
+  place-items: center;
+  overflow: hidden;
+  border-right: 3px solid var(--ink);
+  background-color: #f3ead8;
+  background-image:
+    repeating-linear-gradient(
+      24deg,
+      transparent 0 41px,
+      rgba(33, 25, 23, 0.07) 42px 44px
+    ),
+    repeating-linear-gradient(
+      -17deg,
+      transparent 0 74px,
+      rgba(104, 125, 44, 0.1) 75px 77px
+    );
+  padding: 40px 27px;
+}
+
+.tutorial-art::before,
+.tutorial-art::after {
+  position: absolute;
+  width: 220px;
+  height: 145px;
+  border: 2px solid rgba(220, 106, 124, 0.34);
+  border-radius: 49% 44% 52% 46%;
+  content: "";
+  transform: rotate(25deg);
+}
+
+.tutorial-art::after {
+  width: 260px;
+  height: 110px;
+  border-color: rgba(104, 125, 44, 0.3);
+  transform: rotate(-14deg);
+}
+
+.tutorial-art img {
+  position: relative;
+  z-index: 1;
+  width: min(310px, 100%);
+  height: auto;
+  filter: drop-shadow(3px 5px 0 rgba(33, 25, 23, 0.1));
+}
+
+.tutorial-icon {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: 136px;
+  height: 136px;
+  place-items: center;
+  border: 3px solid var(--ink);
+  border-radius: 42% 52% 45% 49%;
+  background: var(--blush);
+  box-shadow: 6px 7px 0 var(--ink);
+  transform: rotate(-3deg);
+}
+
+.tutorial-icon svg {
+  width: 68px;
+  height: 68px;
+  stroke-width: 1.7;
+}
+
+.tutorial-step-count {
+  position: absolute;
+  z-index: 1;
+  right: 20px;
+  bottom: 19px;
+  border: 1.5px solid var(--ink);
+  border-radius: 4px 7px 4px 6px;
+  background: var(--pale-green);
+  padding: 5px 8px;
+  font-family: var(--font-hand);
+  font-size: 13px;
+  font-weight: 700;
+  transform: rotate(1deg);
+}
+
+.tutorial-copy {
+  align-self: center;
+  padding: 70px 62px 38px 52px;
+}
+
+.tutorial-copy h2 {
+  max-width: 520px;
+  margin: 10px 0 17px;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: clamp(38px, 4.2vw, 55px);
+  line-height: 0.98;
+  letter-spacing: -0.04em;
+}
+
+.tutorial-copy > p:not(.eyebrow) {
+  max-width: 510px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 17px;
+  line-height: 1.55;
+}
+
+.tutorial-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 28px;
+}
+
+.tutorial-items span {
+  position: relative;
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 7px;
+  border: 1.5px solid var(--ink);
+  border-radius: 5px 8px 5px 7px;
+  background: var(--pale-green);
+  padding: 7px 10px;
+  font-family: var(--font-hand);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.tutorial-items span:nth-child(2n) {
+  background: var(--blush);
+  transform: rotate(0.7deg);
+}
+
+.tutorial-items svg {
+  width: 16px;
+  height: 16px;
+  stroke-width: 3;
+}
+
+.tutorial-items b {
+  display: grid;
+  width: 21px;
+  height: 21px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 11px;
+}
+
+.tutorial-actions {
+  display: flex;
+  min-height: 90px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  border-top: 2px dashed rgba(33, 25, 23, 0.38);
+  padding: 18px 34px;
+}
+
+.tutorial-actions > .text-button {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.tutorial-navigation {
+  display: flex;
+  gap: 10px;
+}
+
+.tutorial-dots {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.tutorial-dots button {
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid var(--ink);
+  border-radius: 50%;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+.tutorial-dots button.is-active {
+  width: 22px;
+  border-radius: 10px;
+  background: var(--pink);
+}
+
+@media (max-width: 760px) {
+  .tutorial-backdrop {
+    display: block;
+    padding: 0;
+  }
+
+  .tutorial-card {
+    width: 100%;
+    min-height: 100dvh;
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(190px, 32dvh) 1fr auto;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .tutorial-close {
+    top: max(14px, env(safe-area-inset-top));
+    right: 14px;
+  }
+
+  .tutorial-art {
+    min-height: 0;
+    grid-row: 1;
+    border-right: 0;
+    border-bottom: 3px solid var(--ink);
+    padding: max(38px, env(safe-area-inset-top)) 28px 20px;
+  }
+
+  .tutorial-art img {
+    width: min(300px, 86%);
+    max-height: 170px;
+    object-fit: contain;
+  }
+
+  .tutorial-icon {
+    width: 100px;
+    height: 100px;
+  }
+
+  .tutorial-icon svg {
+    width: 50px;
+    height: 50px;
+  }
+
+  .tutorial-copy {
+    align-self: start;
+    padding: 30px 23px 24px;
+  }
+
+  .tutorial-copy h2 {
+    margin-block: 8px 13px;
+    font-size: clamp(37px, 11vw, 49px);
+  }
+
+  .tutorial-copy > p:not(.eyebrow) {
+    font-size: 15px;
+    line-height: 1.48;
+  }
+
+  .tutorial-items {
+    margin-top: 19px;
+  }
+
+  .tutorial-items span {
+    min-height: 34px;
+    padding: 6px 8px;
+    font-size: 11px;
+  }
+
+  .tutorial-actions {
+    min-height: 0;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 14px 16px max(16px, env(safe-area-inset-bottom));
+  }
+
+  .tutorial-actions > .text-button {
+    order: 2;
+  }
+
+  .tutorial-dots {
+    order: 1;
+  }
+
+  .tutorial-navigation {
+    order: 3;
+    width: 100%;
+  }
+
+  .tutorial-navigation button {
+    flex: 1;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

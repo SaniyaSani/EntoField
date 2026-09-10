@@ -81,80 +81,13 @@ const navigation: Array<{
 ];
 
 const UNASSIGNED_TRIP = "__unassigned__";
-
-const exampleTrip: FieldTrip = {
-  id: "FT-20260730-001",
-  name: "Männedorf meadow walk",
-  startDate: "2026-07-30",
-  endDate: "2026-07-30",
-  region: "Zürich, Switzerland",
-  participants: "Example collector",
-  notes: "Example only — remove it in Settings when you are ready.",
-  createdAt: "2026-07-30T14:30:00.000Z",
-  isExample: true,
-};
-
-const exampleEvent: CollectingEvent = {
-  id: "EF-20260730-003",
-  tripId: exampleTrip.id,
-  name: "Meadow edge sweep",
-  date: "2026-07-30",
-  time: "14:37",
-  country: "Switzerland",
-  region: "Zürich",
-  locality: "Männedorf, meadow edge",
-  latitude: 47.24281,
-  longitude: 8.69214,
-  uncertainty: 6,
-  altitude: 430,
-  coordinateSource: "device GPS",
-  collector: "Example collector",
-  method: "sweep net",
-  habitat: "flower-rich meadow",
-  host: "",
-  weather: "22 °C, partly cloudy, light wind",
-  notes: "Example only — delete it in Settings when you are ready.",
-  photos: [],
-  createdAt: "2026-07-30T14:37:00.000Z",
-  isExample: true,
-};
-
-const exampleSpecimens: SpecimenRecord[] = [
-  {
-    id: "EF-20260730-003-S01",
-    eventId: exampleEvent.id,
-    recordType: "specimen",
-    quantity: 1,
-    scientificName: "Bombus sp.",
-    identifier: "",
-    sex: "",
-    lifeStage: "adult",
-    notes: "",
-    photos: [],
-    createdAt: exampleEvent.createdAt,
-    isExample: true,
-  },
-  {
-    id: "EF-20260730-003-L01",
-    eventId: exampleEvent.id,
-    recordType: "lot",
-    quantity: 11,
-    scientificName: "Coleoptera",
-    identifier: "",
-    sex: "",
-    lifeStage: "adult",
-    notes: "Example lot; can be split into individual specimens.",
-    photos: [],
-    createdAt: exampleEvent.createdAt,
-    isExample: true,
-  },
-];
+const TUTORIAL_STORAGE_KEY = "entofield:tutorial:v1";
 
 const initialState: AppState = {
   schemaVersion: 3,
-  trips: [exampleTrip],
-  events: [exampleEvent],
-  specimens: exampleSpecimens,
+  trips: [],
+  events: [],
+  specimens: [],
   preferences: { defaultCollector: "", recentCollectors: [], idPrefix: "EF" },
 };
 
@@ -174,31 +107,35 @@ function recentCollectorList(values: Array<string | undefined>): string[] {
 }
 
 function normalizeState(stored: Partial<AppState> & { schemaVersion?: number }): AppState {
-  const storedEvents = Array.isArray(stored.events) ? stored.events : [];
-  const storedTrips = Array.isArray(stored.trips) ? stored.trips : [];
-  const needsExampleTrip =
-    !storedTrips.some((trip) => trip.id === exampleTrip.id) &&
-    storedEvents.some((event) => event.isExample && !event.tripId);
-  const trips = needsExampleTrip ? [exampleTrip, ...storedTrips] : storedTrips;
-  const events = storedEvents.map((event) => ({
-    ...event,
-    name: typeof event.name === "string" ? event.name : "",
-    ...(needsExampleTrip && event.isExample && !event.tripId
-      ? { tripId: exampleTrip.id }
-      : {}),
-  }));
+  // Earlier prototypes shipped with demonstration records. Drop them during
+  // hydration so existing installations become as clean as a first install.
+  const trips = (Array.isArray(stored.trips) ? stored.trips : []).filter(
+    (trip) => !trip.isExample,
+  );
+  const tripIds = new Set(trips.map((trip) => trip.id));
+  const events = (Array.isArray(stored.events) ? stored.events : [])
+    .filter((event) => !event.isExample)
+    .map((event) => ({
+      ...event,
+      name: typeof event.name === "string" ? event.name : "",
+      tripId: event.tripId && tripIds.has(event.tripId) ? event.tripId : undefined,
+    }));
+  const eventIds = new Set(events.map((event) => event.id));
+  const specimens = (Array.isArray(stored.specimens) ? stored.specimens : []).filter(
+    (specimen) => !specimen.isExample && eventIds.has(specimen.eventId),
+  );
   const recentCollectors = recentCollectorList([
     ...(Array.isArray(stored.preferences?.recentCollectors)
       ? stored.preferences.recentCollectors
       : []),
-    ...events.filter((event) => !event.isExample).map((event) => event.collector),
+    ...events.map((event) => event.collector),
     stored.preferences?.defaultCollector,
   ]);
   return {
     schemaVersion: 3,
     trips,
     events,
-    specimens: Array.isArray(stored.specimens) ? stored.specimens : [],
+    specimens,
     preferences: {
       ...initialState.preferences,
       ...(stored.preferences ?? {}),
@@ -367,8 +304,9 @@ export default function Home() {
   );
   const [specimenFiles, setSpecimenFiles] = useState<File[]>([]);
   const [bulkCount, setBulkCount] = useState(20);
-  const [includeExamples, setIncludeExamples] = useState(true);
   const [exportBusy, setExportBusy] = useState(false);
+  const [tutorialOpen, setTutorialOpen] = useState(false);
+  const [tutorialStep, setTutorialStep] = useState(0);
   const [installPrompt, setInstallPrompt] = useState<InstallPrompt | null>(null);
   const [labelModal, setLabelModal] = useState<{
     mode: LabelMode;
@@ -385,7 +323,17 @@ export default function Home() {
       .catch(() =>
         setNotice("Local storage could not be opened. Reload before field use."),
       )
-      .finally(() => active && setHydrated(true));
+      .finally(() => {
+        if (!active) return;
+        setHydrated(true);
+        try {
+          setTutorialOpen(
+            window.localStorage.getItem(TUTORIAL_STORAGE_KEY) !== "complete",
+          );
+        } catch {
+          setTutorialOpen(true);
+        }
+      });
     return () => {
       active = false;
     };
@@ -458,18 +406,10 @@ export default function Home() {
     [state.specimens],
   );
 
-  const exportData = useMemo(() => {
-    const events = includeExamples
-      ? state.events
-      : state.events.filter((event) => !event.isExample);
-    const eventIds = new Set(events.map((event) => event.id));
-    const specimens = state.specimens.filter(
-      (specimen) =>
-        eventIds.has(specimen.eventId) &&
-        (includeExamples || !specimen.isExample),
-    );
-    return { events, specimens };
-  }, [includeExamples, state]);
+  const exportData = useMemo(
+    () => ({ events: state.events, specimens: state.specimens }),
+    [state.events, state.specimens],
+  );
 
   function navigate(view: ViewName) {
     setActiveView(view);
@@ -1064,23 +1004,6 @@ export default function Home() {
     }));
   }
 
-  function removeExamples() {
-    const exampleIds = new Set(
-      state.events.filter((event) => event.isExample).map((event) => event.id),
-    );
-    setState((current) => ({
-      ...current,
-      trips: current.trips.filter((trip) => !trip.isExample),
-      events: current.events.filter((event) => !event.isExample),
-      specimens: current.specimens.filter(
-        (specimen) => !specimen.isExample && !exampleIds.has(specimen.eventId),
-      ),
-    }));
-    if (selectedTrip?.isExample) setSelectedTripId(null);
-    setSelectedEventId(null);
-    setNotice("Example records removed.");
-  }
-
   async function eraseEverything() {
     if (
       !window.confirm(
@@ -1134,6 +1057,25 @@ export default function Home() {
     const choice = await installPrompt.userChoice;
     setInstallPrompt(null);
     if (choice.outcome === "accepted") setNotice("EntoField installed.");
+  }
+
+  function completeTutorial(startTrip: boolean) {
+    try {
+      window.localStorage.setItem(TUTORIAL_STORAGE_KEY, "complete");
+    } catch {
+      // The guide can still be dismissed when private storage is unavailable.
+    }
+    setTutorialOpen(false);
+    setTutorialStep(0);
+    if (startTrip) {
+      navigate("events");
+      openNewTrip();
+    }
+  }
+
+  function showTutorial() {
+    setTutorialStep(0);
+    setTutorialOpen(true);
   }
 
   const entoRows = buildEntoLabelRows(
@@ -1296,8 +1238,6 @@ export default function Home() {
             <ExportView
               eventCount={exportData.events.length}
               rowCount={exportData.specimens.length}
-              includeExamples={includeExamples}
-              onIncludeExamples={setIncludeExamples}
               disabled={!entoRows.length}
               busy={exportBusy}
               onXlsx={() =>
@@ -1316,12 +1256,11 @@ export default function Home() {
           {activeView === "settings" && (
             <SettingsView
               preferences={state.preferences}
-              hasExamples={state.events.some((event) => event.isExample)}
               installAvailable={Boolean(installPrompt)}
               onPreferences={updatePreferences}
               onInstall={() => void installApp()}
               onBackup={downloadBackup}
-              onRemoveExamples={removeExamples}
+              onShowTutorial={showTutorial}
               onErase={() => void eraseEverything()}
             />
           )}
@@ -1345,6 +1284,15 @@ export default function Home() {
           );
         })}
       </nav>
+
+      {tutorialOpen && (
+        <Tutorial
+          step={tutorialStep}
+          onStep={setTutorialStep}
+          onSkip={() => completeTutorial(false)}
+          onFinish={() => completeTutorial(true)}
+        />
+      )}
 
       {tripModal && (
         <TripModal
@@ -1445,6 +1393,166 @@ function formatCount(value: number, singular: string, plural = `${singular}s`) {
   return `${value} ${value === 1 ? singular : plural}`;
 }
 
+const tutorialSteps = [
+  {
+    eyebrow: "Welcome to EntoField",
+    title: "Your pocket field notebook",
+    description:
+      "Capture a collecting day without losing the relationship between place, material and labels.",
+    icon: Leaf,
+    items: ["Works offline", "Stays on this device", "No account needed"],
+  },
+  {
+    eyebrow: "A simple structure",
+    title: "Trip → point → specimen",
+    description:
+      "Start one field trip, add every collecting point along the route, then attach specimens or lots to the right point.",
+    icon: Route,
+    items: ["Field trip", "Collecting points", "Specimens & lots"],
+  },
+  {
+    eyebrow: "While you are outside",
+    title: "Save the point while you’re there",
+    description:
+      "EntoField can capture phone GPS, read photo location, and keep habitat, method, weather and notes together.",
+    icon: LocateFixed,
+    items: ["GPS & uncertainty", "Photos & time", "Habitat & method"],
+  },
+  {
+    eyebrow: "Back from the field",
+    title: "Turn notes into labels",
+    description:
+      "Create collection labels, export EntoLabel tables, and download a complete ZIP backup after each field session.",
+    icon: Download,
+    items: ["Print-ready labels", "Excel, CSV & DwC", "Complete ZIP backup"],
+  },
+] as const;
+
+function Tutorial({
+  step,
+  onStep,
+  onSkip,
+  onFinish,
+}: {
+  step: number;
+  onStep: (step: number) => void;
+  onSkip: () => void;
+  onFinish: () => void;
+}) {
+  const current = tutorialSteps[step] ?? tutorialSteps[0];
+  const Icon = current.icon;
+  const lastStep = step === tutorialSteps.length - 1;
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onSkip();
+      if (event.key === "ArrowLeft" && step > 0) onStep(step - 1);
+      if (event.key === "ArrowRight" && !lastStep) onStep(step + 1);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [lastStep, onSkip, onStep, step]);
+
+  return (
+    <div className="tutorial-backdrop" role="presentation">
+      <section
+        className="tutorial-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="tutorial-title"
+        aria-describedby="tutorial-description"
+      >
+        <button
+          className="tutorial-close"
+          onClick={onSkip}
+          aria-label="Skip tutorial"
+        >
+          <X aria-hidden="true" />
+        </button>
+
+        <div className="tutorial-art" aria-hidden="true">
+          {step === 0 ? (
+            <Image
+              src="/brand/entofield-fly-label-ink.png"
+              alt=""
+              width={903}
+              height={330}
+              priority
+              unoptimized
+            />
+          ) : (
+            <div className="tutorial-icon">
+              <Icon />
+            </div>
+          )}
+          <span className="tutorial-step-count">
+            {String(step + 1).padStart(2, "0")} / {String(tutorialSteps.length).padStart(2, "0")}
+          </span>
+        </div>
+
+        <div className="tutorial-copy" aria-live="polite">
+          <p className="eyebrow">{current.eyebrow}</p>
+          <h2 id="tutorial-title">{current.title}</h2>
+          <p id="tutorial-description">{current.description}</p>
+          <div className={`tutorial-items tutorial-items-${step + 1}`}>
+            {current.items.map((item, index) => (
+              <span key={item}>
+                {step === 1 ? (
+                  <b>{index + 1}</b>
+                ) : (
+                  <Check aria-hidden="true" />
+                )}
+                {item}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        <footer className="tutorial-actions">
+          <button className="text-button" onClick={onSkip}>
+            Skip tutorial
+          </button>
+          <div className="tutorial-dots" aria-label={`Step ${step + 1} of ${tutorialSteps.length}`}>
+            {tutorialSteps.map((item, index) => (
+              <button
+                key={item.title}
+                className={index === step ? "is-active" : ""}
+                onClick={() => onStep(index)}
+                aria-label={`Go to step ${index + 1}`}
+                aria-current={index === step ? "step" : undefined}
+              />
+            ))}
+          </div>
+          <div className="tutorial-navigation">
+            {step > 0 && (
+              <button
+                className="secondary-button compact"
+                onClick={() => onStep(step - 1)}
+              >
+                <ArrowLeft aria-hidden="true" /> Back
+              </button>
+            )}
+            <button
+              className="primary-button compact"
+              onClick={lastStep ? onFinish : () => onStep(step + 1)}
+            >
+              {lastStep ? (
+                <>
+                  <Route aria-hidden="true" /> Start first field trip
+                </>
+              ) : (
+                <>
+                  Next <ArrowRight aria-hidden="true" />
+                </>
+              )}
+            </button>
+          </div>
+        </footer>
+      </section>
+    </div>
+  );
+}
+
 function TripsView({
   trips,
   events,
@@ -1523,7 +1631,7 @@ function TripsView({
                   </span>
                   <span className="trip-card-content">
                     <span className="sample-label">
-                      {trip.isExample ? "Example field trip" : trip.region || "Field trip"}
+                      {trip.region || "Field trip"}
                     </span>
                     <strong>{trip.name}</strong>
                     <span className="trip-date">
@@ -2130,7 +2238,7 @@ function EventDetail({
       <div className="detail-heading">
         <div>
           <p className="eyebrow">
-            {event.isExample ? "Example collecting event" : "Collecting event"}
+            Collecting event
             {event.name ? ` · ${event.id}` : ""}
           </p>
           <h1>{event.name || event.id}</h1>
@@ -2373,8 +2481,6 @@ function SpecimensView({
 function ExportView({
   eventCount,
   rowCount,
-  includeExamples,
-  onIncludeExamples,
   disabled,
   busy,
   onXlsx,
@@ -2384,8 +2490,6 @@ function ExportView({
 }: {
   eventCount: number;
   rowCount: number;
-  includeExamples: boolean;
-  onIncludeExamples: (value: boolean) => void;
   disabled: boolean;
   busy: boolean;
   onXlsx: () => void;
@@ -2414,15 +2518,6 @@ function ExportView({
         </div>
         <FileSpreadsheet aria-hidden="true" />
       </div>
-
-      <label className="checkbox-row">
-        <input
-          type="checkbox"
-          checked={includeExamples}
-          onChange={(event) => onIncludeExamples(event.target.checked)}
-        />
-        Include the pink example event in exports
-      </label>
 
       <div className="export-grid">
         <ExportCard
@@ -2457,8 +2552,7 @@ function ExportView({
       </div>
       {disabled && (
         <p className="form-hint">
-          Add a specimen row, or temporarily include the example event, to test
-          an export.
+          Add a specimen or lot to a collecting event to enable exports.
         </p>
       )}
     </section>
@@ -2498,21 +2592,19 @@ function ExportCard({
 
 function SettingsView({
   preferences,
-  hasExamples,
   installAvailable,
   onPreferences,
   onInstall,
   onBackup,
-  onRemoveExamples,
+  onShowTutorial,
   onErase,
 }: {
   preferences: AppState["preferences"];
-  hasExamples: boolean;
   installAvailable: boolean;
   onPreferences: (changes: Partial<AppState["preferences"]>) => void;
   onInstall: () => void;
   onBackup: () => void;
-  onRemoveExamples: () => void;
+  onShowTutorial: () => void;
   onErase: () => void;
 }) {
   return (
@@ -2549,9 +2641,21 @@ function SettingsView({
             />
           </label>
           <p className="form-hint">
-            New event example: {preferences.idPrefix || "EF"}-20260730-001.
+            Event IDs look like {preferences.idPrefix || "EF"}-20260730-001.
             Collector is optional; recently used names are remembered automatically.
           </p>
+        </article>
+
+        <article className="settings-card">
+          <p className="eyebrow">Field guide</p>
+          <h2>Need a quick refresher?</h2>
+          <p>
+            Reopen the four-step guide to trips, collecting points, specimens,
+            labels and backups.
+          </p>
+          <button className="secondary-button compact" onClick={onShowTutorial}>
+            <Route aria-hidden="true" /> Open tutorial
+          </button>
         </article>
 
         <article className="settings-card accent">
@@ -2594,11 +2698,6 @@ function SettingsView({
           <p className="eyebrow">Clean up</p>
           <h2>Local data</h2>
           <div className="danger-actions">
-            {hasExamples && (
-              <button className="secondary-button compact" onClick={onRemoveExamples}>
-                Remove example
-              </button>
-            )}
             <button className="danger-button" onClick={onErase}>
               <Trash2 aria-hidden="true" /> Delete everything
             </button>

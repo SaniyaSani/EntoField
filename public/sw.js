@@ -1,9 +1,13 @@
-const CACHE_NAME = "entofield-v4-swiss-coordinate-labels";
+const CACHE_NAME = "entofield-v5-field-ink";
 const APP_SHELL = [
   "/",
   "/manifest.webmanifest",
+  "/favicon.svg",
   "/icon-192.png",
   "/icon-512.png",
+  "/icon-1024.png",
+  "/brand/entofield-logo-ink.png",
+  "/brand/entofield-fly-label-ink.png",
   "/fonts/DejaVuSans.ttf",
   "/fonts/DejaVuSans-Bold.ttf",
   "/fonts/DejaVuSans-Oblique.ttf",

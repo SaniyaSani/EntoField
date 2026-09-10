@@ -1148,11 +1148,19 @@ export default function Home() {
   return (
     <div className="app-shell">
       <aside className="side-navigation" aria-label="Main navigation">
-        <button className="brand" onClick={() => navigate("events")}>
-          <span className="brand-mark">
-            <Bug aria-hidden="true" />
-          </span>
-          <span>EntoField</span>
+        <button
+          className="brand"
+          onClick={() => navigate("events")}
+          aria-label="Go to Field trips"
+        >
+          <Image
+            className="brand-logo"
+            src="/brand/entofield-logo-ink.png"
+            alt=""
+            width={903}
+            height={489}
+            priority
+          />
         </button>
         <nav className="navigation-list">
           {navigation.map((item) => {
@@ -1173,9 +1181,9 @@ export default function Home() {
           })}
         </nav>
         <div className="sidebar-stats">
-          <span>{state.trips.length} field trips</span>
-          <span>{state.events.length} events</span>
-          <span>{totalIndividuals} individuals</span>
+          <span>{formatCount(state.trips.length, "field trip")}</span>
+          <span>{formatCount(state.events.length, "event")}</span>
+          <span>{formatCount(totalIndividuals, "individual")}</span>
         </div>
         <div className="sidebar-flourish" aria-hidden="true">
           <Leaf />
@@ -1186,6 +1194,19 @@ export default function Home() {
 
       <main className="main-area">
         <header className="utility-header">
+          <button
+            className="mobile-brand"
+            onClick={() => navigate("events")}
+            aria-label="Go to Field trips"
+          >
+            <Image
+              src="/brand/entofield-logo-ink.png"
+              alt=""
+              width={903}
+              height={489}
+              priority
+            />
+          </button>
           <button
             className={`status-chip ${online ? "" : "is-offline"}`}
             onClick={() =>
@@ -1418,6 +1439,10 @@ function individualCount(records: SpecimenRecord[], eventIds: Set<string>) {
   );
 }
 
+function formatCount(value: number, singular: string, plural = `${singular}s`) {
+  return `${value} ${value === 1 ? singular : plural}`;
+}
+
 function TripsView({
   trips,
   events,
@@ -1455,10 +1480,10 @@ function TripsView({
       {!orderedTrips.length && !unassigned.length ? (
         <div className="empty-state trip-empty-state">
           <Image
-            src="/field-illustration.png"
+            src="/brand/entofield-fly-label-ink.png"
             alt=""
-            width={1536}
-            height={1152}
+            width={903}
+            height={330}
             priority
           />
           <p className="eyebrow">Ready for an excursion</p>
@@ -1502,9 +1527,9 @@ function TripsView({
                       <CalendarDays aria-hidden="true" /> {formatTripDates(trip)}
                     </span>
                     <span className="trip-metrics">
-                      <span>{tripEvents.length} events</span>
+                      <span>{formatCount(tripEvents.length, "event")}</span>
                       <span>{mapped} mapped</span>
-                      <span>{individuals} individuals</span>
+                      <span>{formatCount(individuals, "individual")}</span>
                     </span>
                     <span className="trip-open">
                       Open field trip <ArrowRight aria-hidden="true" />
@@ -1531,13 +1556,15 @@ function TripsView({
                     Older records that are not inside a field trip yet
                   </span>
                   <span className="trip-metrics">
-                    <span>{unassigned.length} events</span>
+                    <span>{formatCount(unassigned.length, "event")}</span>
                     <span>
-                      {individualCount(
-                        specimens,
-                        new Set(unassigned.map((event) => event.id)),
-                      )}{" "}
-                      individuals
+                      {formatCount(
+                        individualCount(
+                          specimens,
+                          new Set(unassigned.map((event) => event.id)),
+                        ),
+                        "individual",
+                      )}
                     </span>
                   </span>
                   <span className="trip-open">
@@ -1615,8 +1642,8 @@ function TripView({
                 <CalendarDays aria-hidden="true" /> {formatTripDates(trip)}
               </span>
             )}
-            <span>{events.length} events</span>
-            <span>{individuals} individuals</span>
+            <span>{formatCount(events.length, "event")}</span>
+            <span>{formatCount(individuals, "individual")}</span>
           </p>
         </div>
         <div className="heading-actions">
@@ -1729,7 +1756,7 @@ function TripView({
                   <div className="trip-event-tags">
                     {event.method && <span>{event.method}</span>}
                     {event.habitat && <span>{event.habitat}</span>}
-                    <span>{count} individuals</span>
+                    <span>{formatCount(count, "individual")}</span>
                   </div>
                   <button
                     className="trip-event-open"
@@ -2222,7 +2249,7 @@ function EventDetail({
                 <h3>{record.scientificName || "Identification pending"}</h3>
                 <p>
                   {record.recordType === "lot"
-                    ? `Lot · ${record.quantity} individuals`
+                    ? `Lot · ${formatCount(record.quantity, "individual")}`
                     : "Individual specimen"}
                   {record.lifeStage ? ` · ${record.lifeStage}` : ""}
                   {record.sex ? ` · ${record.sex}` : ""}
@@ -2375,7 +2402,7 @@ function ExportView({
         <div>
           <p className="eyebrow">Ready for EntoLabel</p>
           <h2>
-            {rowCount} rows from {eventCount} events
+            {formatCount(rowCount, "row")} from {formatCount(eventCount, "event")}
           </h2>
           <p>
             Each specimen row receives its event GPS, date, locality, collector,

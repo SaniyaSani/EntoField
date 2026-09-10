@@ -1,12 +1,12 @@
-const CACHE_NAME = "entofield-v9-versioned-app-icon";
+const CACHE_NAME = "entofield-v10-guided-tour-fly-icon";
 const APP_SHELL = [
   "/",
   "/manifest.webmanifest",
-  "/entofield-favicon-v2.svg",
-  "/entofield-app-icon-v2-192.png",
-  "/entofield-app-icon-v2-512.png",
-  "/entofield-app-icon-v2-1024.png",
-  "/entofield-apple-touch-icon-v2.png",
+  "/entofield-favicon-v3.png",
+  "/entofield-app-icon-v3-192.png",
+  "/entofield-app-icon-v3-512.png",
+  "/entofield-app-icon-v3-1024.png",
+  "/entofield-apple-touch-icon-v3.png",
   "/brand/entofield-logo-ink.png",
   "/brand/entofield-fly-label-ink.png",
   "/fonts/DejaVuSans.ttf",

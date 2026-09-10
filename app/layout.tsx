@@ -18,25 +18,26 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       {
-        url: "/entofield-favicon-v2.svg",
-        type: "image/svg+xml",
+        url: "/entofield-favicon-v3.png",
+        sizes: "64x64",
+        type: "image/png",
       },
       {
-        url: "/entofield-app-icon-v2-192.png",
+        url: "/entofield-app-icon-v3-192.png",
         sizes: "192x192",
         type: "image/png",
       },
       {
-        url: "/entofield-app-icon-v2-512.png",
+        url: "/entofield-app-icon-v3-512.png",
         sizes: "512x512",
         type: "image/png",
       },
     ],
-    shortcut: "/entofield-favicon-v2.svg",
+    shortcut: "/entofield-favicon-v3.png",
     apple: [
       {
-        url: "/entofield-apple-touch-icon-v2.png",
-        sizes: "192x192",
+        url: "/entofield-apple-touch-icon-v3.png",
+        sizes: "180x180",
         type: "image/png",
       },
     ],

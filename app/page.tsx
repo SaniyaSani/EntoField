@@ -81,7 +81,7 @@ const navigation: Array<{
 ];
 
 const UNASSIGNED_TRIP = "__unassigned__";
-const TUTORIAL_STORAGE_KEY = "entofield:tutorial:v1";
+const TUTORIAL_STORAGE_KEY = "entofield:tutorial:v2";
 
 const initialState: AppState = {
   schemaVersion: 3,
@@ -421,6 +421,7 @@ export default function Home() {
     setEditingTripId(null);
     setTripDraft(emptyTrip());
     setTripModal(true);
+    if (tutorialOpen && tutorialStep === 0) setTutorialStep(1);
   }
 
   function openEditTrip(trip: FieldTrip) {
@@ -462,6 +463,7 @@ export default function Home() {
       }));
       setSelectedTripId(id);
       setNotice(`${fieldTrip.name} created. Add the first collecting event.`);
+      if (tutorialOpen && tutorialStep === 2) setTutorialStep(3);
     }
     setTripModal(false);
   }
@@ -499,6 +501,7 @@ export default function Home() {
     });
     setEventFiles([]);
     setEventModal(true);
+    if (tutorialOpen && tutorialStep === 3) setTutorialStep(4);
     void captureGps("automatic");
   }
 
@@ -836,6 +839,7 @@ export default function Home() {
       }));
       setSelectedEventId(id);
       setNotice(`${id} created. Add specimens or a lot now.`);
+      if (tutorialOpen && tutorialStep === 6) setTutorialStep(7);
     }
     setEventModal(false);
     setEventFiles([]);
@@ -1059,7 +1063,7 @@ export default function Home() {
     if (choice.outcome === "accepted") setNotice("EntoField installed.");
   }
 
-  function completeTutorial(startTrip: boolean) {
+  function completeTutorial() {
     try {
       window.localStorage.setItem(TUTORIAL_STORAGE_KEY, "complete");
     } catch {
@@ -1067,15 +1071,37 @@ export default function Home() {
     }
     setTutorialOpen(false);
     setTutorialStep(0);
-    if (startTrip) {
-      navigate("events");
-      openNewTrip();
-    }
   }
 
   function showTutorial() {
+    setTripModal(false);
+    setEventModal(false);
+    setSpecimenModal(false);
+    setSelectedTripId(null);
+    setSelectedEventId(null);
+    setActiveView("events");
     setTutorialStep(0);
     setTutorialOpen(true);
+  }
+
+  function advanceTutorial() {
+    if (tutorialStep === 0) {
+      openNewTrip();
+      return;
+    }
+    if (tutorialStep === 1 && tripDraft.name.trim()) {
+      setTutorialStep(2);
+      return;
+    }
+    if (tutorialStep === 4) {
+      setTutorialStep(5);
+      return;
+    }
+    if (tutorialStep === 5) {
+      setTutorialStep(6);
+      return;
+    }
+    if (tutorialStep === 7) completeTutorial();
   }
 
   const entoRows = buildEntoLabelRows(
@@ -1286,11 +1312,11 @@ export default function Home() {
       </nav>
 
       {tutorialOpen && (
-        <Tutorial
+        <GuidedTour
           step={tutorialStep}
-          onStep={setTutorialStep}
-          onSkip={() => completeTutorial(false)}
-          onFinish={() => completeTutorial(true)}
+          canAdvance={tutorialStep !== 1 || Boolean(tripDraft.name.trim())}
+          onAdvance={advanceTutorial}
+          onSkip={completeTutorial}
         />
       )}
 
@@ -1393,161 +1419,231 @@ function formatCount(value: number, singular: string, plural = `${singular}s`) {
   return `${value} ${value === 1 ? singular : plural}`;
 }
 
-const tutorialSteps = [
+const guidedTourSteps: ReadonlyArray<{
+  target: string;
+  eyebrow: string;
+  title: string;
+  description: string;
+  action?: string;
+}> = [
   {
-    eyebrow: "Welcome to EntoField",
-    title: "Your pocket field notebook",
+    target: "new-trip",
+    eyebrow: "Step 1 · Field trip",
+    title: "Start here",
     description:
-      "Capture a collecting day without losing the relationship between place, material and labels.",
-    icon: Leaf,
-    items: ["Works offline", "Stays on this device", "No account needed"],
+      "A field trip keeps all collecting points from one excursion together. Tap the highlighted button.",
+    action: "Open trip form",
   },
   {
-    eyebrow: "A simple structure",
-    title: "Trip → point → specimen",
+    target: "trip-name",
+    eyebrow: "Step 2 · Name it",
+    title: "Give the day a name",
     description:
-      "Start one field trip, add every collecting point along the route, then attach specimens or lots to the right point.",
-    icon: Route,
-    items: ["Field trip", "Collecting points", "Specimens & lots"],
+      "Type a name you will recognise later. Dates, destination and participants stay editable.",
+    action: "Next",
   },
   {
-    eyebrow: "While you are outside",
-    title: "Save the point while you’re there",
+    target: "trip-create",
+    eyebrow: "Step 3 · Save",
+    title: "Create the field trip",
     description:
-      "EntoField can capture phone GPS, read photo location, and keep habitat, method, weather and notes together.",
-    icon: LocateFixed,
-    items: ["GPS & uncertainty", "Photos & time", "Habitat & method"],
+      "Tap the highlighted button when the trip details are ready.",
   },
   {
-    eyebrow: "Back from the field",
-    title: "Turn notes into labels",
+    target: "new-event",
+    eyebrow: "Step 4 · Collecting point",
+    title: "Add the first point",
     description:
-      "Create collection labels, export EntoLabel tables, and download a complete ZIP backup after each field session.",
-    icon: Download,
-    items: ["Print-ready labels", "Excel, CSV & DwC", "Complete ZIP backup"],
+      "Each stop along the route becomes its own event with GPS, habitat, method and material.",
   },
-] as const;
+  {
+    target: "event-capture",
+    eyebrow: "Step 5 · Fast capture",
+    title: "Let the phone help",
+    description:
+      "Use phone GPS, start from a photograph, or add a weather estimate. Everything remains editable.",
+    action: "Continue",
+  },
+  {
+    target: "event-details",
+    eyebrow: "Step 6 · Field notes",
+    title: "Add what matters",
+    description:
+      "Record locality, collector, method, habitat and host. Only the date is required.",
+    action: "Next",
+  },
+  {
+    target: "event-create",
+    eyebrow: "Step 7 · Save the point",
+    title: "Create the event",
+    description:
+      "Tap the highlighted button. Its field data will be inherited by every specimen and lot you add.",
+  },
+  {
+    target: "add-material",
+    eyebrow: "Step 8 · Collected material",
+    title: "Now add specimens or lots",
+    description:
+      "These buttons add material. Collection labels are available just above—even before specimens are entered.",
+    action: "Finish tour",
+  },
+];
 
-function Tutorial({
+type TourTargetRect = {
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+};
+
+function GuidedTour({
   step,
-  onStep,
+  canAdvance,
+  onAdvance,
   onSkip,
-  onFinish,
 }: {
   step: number;
-  onStep: (step: number) => void;
+  canAdvance: boolean;
+  onAdvance: () => void;
   onSkip: () => void;
-  onFinish: () => void;
 }) {
-  const current = tutorialSteps[step] ?? tutorialSteps[0];
-  const Icon = current.icon;
-  const lastStep = step === tutorialSteps.length - 1;
+  const current = guidedTourSteps[step] ?? guidedTourSteps[0];
+  const [targetRect, setTargetRect] = useState<TourTargetRect | null>(null);
+
+  useEffect(() => {
+    let disposed = false;
+    let frame = 0;
+    const timers: number[] = [];
+
+    const update = () => {
+      if (disposed) return;
+      const candidates = Array.from(
+        document.querySelectorAll<HTMLElement>(`[data-tour="${current.target}"]`),
+      );
+      const target = candidates.find((element) => {
+        const rect = element.getBoundingClientRect();
+        const style = window.getComputedStyle(element);
+        return rect.width > 0 && rect.height > 0 && style.visibility !== "hidden";
+      });
+      if (!target) {
+        setTargetRect(null);
+        return;
+      }
+      const rect = target.getBoundingClientRect();
+      setTargetRect({
+        top: Math.max(8, rect.top - 8),
+        left: Math.max(8, rect.left - 8),
+        width: Math.min(window.innerWidth - 16, rect.width + 16),
+        height: Math.min(window.innerHeight - 16, rect.height + 16),
+      });
+    };
+
+    const reveal = () => {
+      const target = document.querySelector<HTMLElement>(
+        `[data-tour="${current.target}"]`,
+      );
+      target?.scrollIntoView({ behavior: "smooth", block: "center" });
+      frame = window.requestAnimationFrame(update);
+      timers.push(window.setTimeout(update, 180));
+      timers.push(window.setTimeout(update, 420));
+    };
+
+    reveal();
+    window.addEventListener("resize", update);
+    window.addEventListener("scroll", update, true);
+    return () => {
+      disposed = true;
+      window.cancelAnimationFrame(frame);
+      timers.forEach((timer) => window.clearTimeout(timer));
+      window.removeEventListener("resize", update);
+      window.removeEventListener("scroll", update, true);
+    };
+  }, [current.target]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") onSkip();
-      if (event.key === "ArrowLeft" && step > 0) onStep(step - 1);
-      if (event.key === "ArrowRight" && !lastStep) onStep(step + 1);
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [lastStep, onSkip, onStep, step]);
+  }, [onSkip]);
+
+  const viewportWidth = typeof window === "undefined" ? 390 : window.innerWidth;
+  const viewportHeight = typeof window === "undefined" ? 844 : window.innerHeight;
+  const tooltipWidth = Math.min(360, viewportWidth - 24);
+  const estimatedTooltipHeight = 235;
+  const tooltipLeft = targetRect
+    ? Math.max(
+        12,
+        Math.min(
+          viewportWidth - tooltipWidth - 12,
+          targetRect.left + targetRect.width / 2 - tooltipWidth / 2,
+        ),
+      )
+    : Math.max(12, (viewportWidth - tooltipWidth) / 2);
+  const tooltipTop = targetRect
+    ? targetRect.top + targetRect.height + estimatedTooltipHeight + 16 < viewportHeight
+      ? targetRect.top + targetRect.height + 16
+      : Math.max(12, targetRect.top - estimatedTooltipHeight - 16)
+    : Math.max(12, (viewportHeight - estimatedTooltipHeight) / 2);
 
   return (
-    <div className="tutorial-backdrop" role="presentation">
+    <div className="guided-tour-layer" role="presentation">
+      {targetRect ? (
+        <div
+          className="guided-tour-spotlight"
+          style={{
+            top: targetRect.top,
+            left: targetRect.left,
+            width: targetRect.width,
+            height: targetRect.height,
+          }}
+          aria-hidden="true"
+        />
+      ) : (
+        <div className="guided-tour-dimmer" aria-hidden="true" />
+      )}
+
       <section
-        className="tutorial-card"
+        className="guided-tour-tip"
+        style={{ top: tooltipTop, left: tooltipLeft, width: tooltipWidth }}
         role="dialog"
-        aria-modal="true"
-        aria-labelledby="tutorial-title"
-        aria-describedby="tutorial-description"
+        aria-live="polite"
+        aria-labelledby="guided-tour-title"
+        aria-describedby="guided-tour-description"
       >
-        <button
-          className="tutorial-close"
-          onClick={onSkip}
-          aria-label="Skip tutorial"
-        >
-          <X aria-hidden="true" />
-        </button>
-
-        <div className="tutorial-art" aria-hidden="true">
-          {step === 0 ? (
-            <Image
-              src="/brand/entofield-fly-label-ink.png"
-              alt=""
-              width={903}
-              height={330}
-              priority
-              unoptimized
-            />
-          ) : (
-            <div className="tutorial-icon">
-              <Icon />
-            </div>
-          )}
-          <span className="tutorial-step-count">
-            {String(step + 1).padStart(2, "0")} / {String(tutorialSteps.length).padStart(2, "0")}
-          </span>
-        </div>
-
-        <div className="tutorial-copy" aria-live="polite">
-          <p className="eyebrow">{current.eyebrow}</p>
-          <h2 id="tutorial-title">{current.title}</h2>
-          <p id="tutorial-description">{current.description}</p>
-          <div className={`tutorial-items tutorial-items-${step + 1}`}>
-            {current.items.map((item, index) => (
-              <span key={item}>
-                {step === 1 ? (
-                  <b>{index + 1}</b>
-                ) : (
-                  <Check aria-hidden="true" />
-                )}
-                {item}
-              </span>
-            ))}
-          </div>
-        </div>
-
-        <footer className="tutorial-actions">
-          <button className="text-button" onClick={onSkip}>
-            Skip tutorial
+        <div className="guided-tour-tip-topline">
+          <span>{current.eyebrow}</span>
+          <button onClick={onSkip} aria-label="Skip tutorial">
+            <X aria-hidden="true" />
           </button>
-          <div className="tutorial-dots" aria-label={`Step ${step + 1} of ${tutorialSteps.length}`}>
-            {tutorialSteps.map((item, index) => (
-              <button
-                key={item.title}
-                className={index === step ? "is-active" : ""}
-                onClick={() => onStep(index)}
-                aria-label={`Go to step ${index + 1}`}
-                aria-current={index === step ? "step" : undefined}
-              />
-            ))}
-          </div>
-          <div className="tutorial-navigation">
-            {step > 0 && (
-              <button
-                className="secondary-button compact"
-                onClick={() => onStep(step - 1)}
-              >
-                <ArrowLeft aria-hidden="true" /> Back
-              </button>
-            )}
+        </div>
+        <h2 id="guided-tour-title">{current.title}</h2>
+        <p id="guided-tour-description">{current.description}</p>
+        <div className="guided-tour-tip-footer">
+          <button className="text-button" onClick={onSkip}>
+            Skip
+          </button>
+          <span className="guided-tour-progress">
+            {step + 1} / {guidedTourSteps.length}
+          </span>
+          {current.action ? (
             <button
               className="primary-button compact"
-              onClick={lastStep ? onFinish : () => onStep(step + 1)}
+              onClick={onAdvance}
+              disabled={!canAdvance}
             >
-              {lastStep ? (
-                <>
-                  <Route aria-hidden="true" /> Start first field trip
-                </>
-              ) : (
-                <>
-                  Next <ArrowRight aria-hidden="true" />
-                </>
-              )}
+              {current.action} <ArrowRight aria-hidden="true" />
             </button>
-          </div>
-        </footer>
+          ) : (
+            <span className="guided-tour-tap">
+              Tap highlighted <ArrowRight aria-hidden="true" />
+            </span>
+          )}
+        </div>
+        {!canAdvance && (
+          <p className="guided-tour-requirement">Type a trip name to continue.</p>
+        )}
       </section>
     </div>
   );
@@ -1581,7 +1677,7 @@ function TripsView({
             Keep every collecting point together as one mapped field day.
           </p>
         </div>
-        <button className="primary-button" onClick={onNewTrip}>
+        <button className="primary-button" onClick={onNewTrip} data-tour="new-trip">
           <Plus aria-hidden="true" />
           New field trip
         </button>
@@ -1603,7 +1699,7 @@ function TripsView({
             Each point keeps its own GPS, habitat, method, weather and specimens,
             while the trip keeps them together on one map.
           </p>
-          <button className="primary-button" onClick={onNewTrip}>
+          <button className="primary-button" onClick={onNewTrip} data-tour="new-trip">
             <Route aria-hidden="true" /> Start first field trip
           </button>
         </div>
@@ -1795,7 +1891,7 @@ function TripView({
           onSelectEvent={focusFromMap}
           onOpenEvent={onSelectEvent}
         />
-        <button className="map-new-event" onClick={onNewEvent}>
+        <button className="map-new-event" onClick={onNewEvent} data-tour="new-event">
           <Plus aria-hidden="true" /> New event
         </button>
       </div>
@@ -2310,7 +2406,7 @@ function EventDetail({
           <p className="eyebrow">Collected material</p>
           <h2>Specimens and lots</h2>
         </div>
-        <div className="record-actions">
+        <div className="record-actions" data-tour="add-material">
           <button className="secondary-button compact" onClick={onAddLot}>
             <Package aria-hidden="true" /> Add lot
           </button>
@@ -2650,8 +2746,8 @@ function SettingsView({
           <p className="eyebrow">Field guide</p>
           <h2>Need a quick refresher?</h2>
           <p>
-            Reopen the four-step guide to trips, collecting points, specimens,
-            labels and backups.
+            Reopen the guided walkthrough. It highlights each control while you
+            create a trip and its first collecting point.
           </p>
           <button className="secondary-button compact" onClick={onShowTutorial}>
             <Route aria-hidden="true" /> Open tutorial
@@ -2749,6 +2845,7 @@ function TripModal({
               <input
                 required
                 autoFocus
+                data-tour="trip-name"
                 value={draft.name}
                 onChange={(event) => patch({ name: event.target.value })}
                 placeholder="e.g. Rigi BioBlitz"
@@ -2810,7 +2907,7 @@ function TripModal({
             <button type="button" className="secondary-button" onClick={onClose}>
               Cancel
             </button>
-            <button type="submit" className="primary-button">
+            <button type="submit" className="primary-button" data-tour="trip-create">
               <Check aria-hidden="true" />
               {editing ? "Save changes" : "Create field trip"}
             </button>
@@ -2867,7 +2964,7 @@ function EventModal({
           </button>
         </div>
         <form onSubmit={onSubmit}>
-          <div className="quick-capture">
+          <div className="quick-capture" data-tour="event-capture">
             <button
               type="button"
               onClick={onGps}
@@ -2939,7 +3036,7 @@ function EventModal({
             </div>
           )}
 
-          <div className="form-grid">
+          <div className="form-grid" data-tour="event-details">
             <label className="field span-2">
               <span>Event name</span>
               <input
@@ -3145,7 +3242,7 @@ function EventModal({
             <button type="button" className="secondary-button" onClick={onClose}>
               Cancel
             </button>
-            <button type="submit" className="primary-button">
+            <button type="submit" className="primary-button" data-tour="event-create">
               <Check aria-hidden="true" />
               {editing ? "Save changes" : "Create event"}
             </button>

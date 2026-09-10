@@ -11,9 +11,11 @@ test("starts with a clean field notebook", () => {
   assert.match(source, /trips: \[\],\s*events: \[\],\s*specimens: \[\]/);
 });
 
-test("includes a persistent and reopenable first-run tutorial", () => {
-  assert.match(source, /entofield:tutorial:v1/);
-  assert.match(source, /aria-labelledby="tutorial-title"/);
-  assert.match(source, /Start first field trip/);
+test("includes a persistent and reopenable contextual guided tour", () => {
+  assert.match(source, /entofield:tutorial:v2/);
+  assert.match(source, /guided-tour-spotlight/);
+  assert.match(source, /data-tour="new-trip"/);
+  assert.match(source, /data-tour="event-capture"/);
+  assert.match(source, /Tap highlighted/);
   assert.match(source, /Open tutorial/);
 });

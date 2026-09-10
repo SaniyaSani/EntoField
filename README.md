@@ -11,8 +11,8 @@ specimen rows.
 
 ## What the prototype does
 
-- opens with a short four-step field guide and an empty notebook instead of
-  demonstration records; the guide can be reopened from Settings;
+- opens with an interactive guided tour that spotlights the exact controls for
+  creating a trip and collecting point; the tour can be reopened from Settings;
 - creates collecting events with an optional human-readable event name, date/time,
   locality, GPS, uncertainty, altitude, optional collector, method, habitat,
   host/substrate, weather, notes, and photographs;

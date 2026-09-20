@@ -16,9 +16,9 @@ export const metadata: Metadata = {
     "codex-preview": "development",
   },
   icons: {
-    icon: "/icon-192.png",
-    shortcut: "/icon-192.png",
-    apple: "/icon-192.png",
+    icon: "/entofield-icon.png",
+    shortcut: "/entofield-icon.png",
+    apple: "/entofield-icon.png",
   },
 };
 

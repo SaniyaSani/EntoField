@@ -1149,10 +1149,14 @@ export default function Home() {
     <div className="app-shell">
       <aside className="side-navigation" aria-label="Main navigation">
         <button className="brand" onClick={() => navigate("events")}>
-          <span className="brand-mark">
-            <Bug aria-hidden="true" />
-          </span>
-          <span>EntoField</span>
+          <Image
+            className="brand-image"
+            src="/entofield-logo.png"
+            alt="EntoField"
+            width={1120}
+            height={700}
+            priority
+          />
         </button>
         <nav className="navigation-list">
           {navigation.map((item) => {

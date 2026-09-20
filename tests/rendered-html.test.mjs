@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const developmentPreviewMeta =
@@ -30,4 +31,22 @@ test("renders development preview metadata", async () => {
     /^text\/html\b/i,
   );
   assert.match(await response.text(), developmentPreviewMeta);
+});
+
+test("event photo picker allows the Photo Library on mobile", async () => {
+  const source = await readFile(
+    new URL("../app/page.tsx", import.meta.url),
+    "utf8",
+  );
+  const quickPhotoPicker = source.match(
+    /<strong>\{photoBusy[\s\S]*?Create from photo[\s\S]*?<input[\s\S]*?\/>/,
+  )?.[0];
+
+  assert.ok(quickPhotoPicker, "event photo picker should be present");
+  assert.match(quickPhotoPicker, /accept="image\/\*"/);
+  assert.doesNotMatch(
+    quickPhotoPicker,
+    /\bcapture=/,
+    "capture would force the camera instead of allowing Photo Library selection",
+  );
 });

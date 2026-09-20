@@ -81,13 +81,80 @@ const navigation: Array<{
 ];
 
 const UNASSIGNED_TRIP = "__unassigned__";
-const TUTORIAL_STORAGE_KEY = "entofield:tutorial:v2";
+
+const exampleTrip: FieldTrip = {
+  id: "FT-20260730-001",
+  name: "Männedorf meadow walk",
+  startDate: "2026-07-30",
+  endDate: "2026-07-30",
+  region: "Zürich, Switzerland",
+  participants: "Example collector",
+  notes: "Example only — remove it in Settings when you are ready.",
+  createdAt: "2026-07-30T14:30:00.000Z",
+  isExample: true,
+};
+
+const exampleEvent: CollectingEvent = {
+  id: "EF-20260730-003",
+  tripId: exampleTrip.id,
+  name: "Meadow edge sweep",
+  date: "2026-07-30",
+  time: "14:37",
+  country: "Switzerland",
+  region: "Zürich",
+  locality: "Männedorf, meadow edge",
+  latitude: 47.24281,
+  longitude: 8.69214,
+  uncertainty: 6,
+  altitude: 430,
+  coordinateSource: "device GPS",
+  collector: "Example collector",
+  method: "sweep net",
+  habitat: "flower-rich meadow",
+  host: "",
+  weather: "22 °C, partly cloudy, light wind",
+  notes: "Example only — delete it in Settings when you are ready.",
+  photos: [],
+  createdAt: "2026-07-30T14:37:00.000Z",
+  isExample: true,
+};
+
+const exampleSpecimens: SpecimenRecord[] = [
+  {
+    id: "EF-20260730-003-S01",
+    eventId: exampleEvent.id,
+    recordType: "specimen",
+    quantity: 1,
+    scientificName: "Bombus sp.",
+    identifier: "",
+    sex: "",
+    lifeStage: "adult",
+    notes: "",
+    photos: [],
+    createdAt: exampleEvent.createdAt,
+    isExample: true,
+  },
+  {
+    id: "EF-20260730-003-L01",
+    eventId: exampleEvent.id,
+    recordType: "lot",
+    quantity: 11,
+    scientificName: "Coleoptera",
+    identifier: "",
+    sex: "",
+    lifeStage: "adult",
+    notes: "Example lot; can be split into individual specimens.",
+    photos: [],
+    createdAt: exampleEvent.createdAt,
+    isExample: true,
+  },
+];
 
 const initialState: AppState = {
   schemaVersion: 3,
-  trips: [],
-  events: [],
-  specimens: [],
+  trips: [exampleTrip],
+  events: [exampleEvent],
+  specimens: exampleSpecimens,
   preferences: { defaultCollector: "", recentCollectors: [], idPrefix: "EF" },
 };
 
@@ -107,35 +174,31 @@ function recentCollectorList(values: Array<string | undefined>): string[] {
 }
 
 function normalizeState(stored: Partial<AppState> & { schemaVersion?: number }): AppState {
-  // Earlier prototypes shipped with demonstration records. Drop them during
-  // hydration so existing installations become as clean as a first install.
-  const trips = (Array.isArray(stored.trips) ? stored.trips : []).filter(
-    (trip) => !trip.isExample,
-  );
-  const tripIds = new Set(trips.map((trip) => trip.id));
-  const events = (Array.isArray(stored.events) ? stored.events : [])
-    .filter((event) => !event.isExample)
-    .map((event) => ({
-      ...event,
-      name: typeof event.name === "string" ? event.name : "",
-      tripId: event.tripId && tripIds.has(event.tripId) ? event.tripId : undefined,
-    }));
-  const eventIds = new Set(events.map((event) => event.id));
-  const specimens = (Array.isArray(stored.specimens) ? stored.specimens : []).filter(
-    (specimen) => !specimen.isExample && eventIds.has(specimen.eventId),
-  );
+  const storedEvents = Array.isArray(stored.events) ? stored.events : [];
+  const storedTrips = Array.isArray(stored.trips) ? stored.trips : [];
+  const needsExampleTrip =
+    !storedTrips.some((trip) => trip.id === exampleTrip.id) &&
+    storedEvents.some((event) => event.isExample && !event.tripId);
+  const trips = needsExampleTrip ? [exampleTrip, ...storedTrips] : storedTrips;
+  const events = storedEvents.map((event) => ({
+    ...event,
+    name: typeof event.name === "string" ? event.name : "",
+    ...(needsExampleTrip && event.isExample && !event.tripId
+      ? { tripId: exampleTrip.id }
+      : {}),
+  }));
   const recentCollectors = recentCollectorList([
     ...(Array.isArray(stored.preferences?.recentCollectors)
       ? stored.preferences.recentCollectors
       : []),
-    ...events.map((event) => event.collector),
+    ...events.filter((event) => !event.isExample).map((event) => event.collector),
     stored.preferences?.defaultCollector,
   ]);
   return {
     schemaVersion: 3,
     trips,
     events,
-    specimens,
+    specimens: Array.isArray(stored.specimens) ? stored.specimens : [],
     preferences: {
       ...initialState.preferences,
       ...(stored.preferences ?? {}),
@@ -304,9 +367,8 @@ export default function Home() {
   );
   const [specimenFiles, setSpecimenFiles] = useState<File[]>([]);
   const [bulkCount, setBulkCount] = useState(20);
+  const [includeExamples, setIncludeExamples] = useState(true);
   const [exportBusy, setExportBusy] = useState(false);
-  const [tutorialOpen, setTutorialOpen] = useState(false);
-  const [tutorialStep, setTutorialStep] = useState(0);
   const [installPrompt, setInstallPrompt] = useState<InstallPrompt | null>(null);
   const [labelModal, setLabelModal] = useState<{
     mode: LabelMode;
@@ -323,17 +385,7 @@ export default function Home() {
       .catch(() =>
         setNotice("Local storage could not be opened. Reload before field use."),
       )
-      .finally(() => {
-        if (!active) return;
-        setHydrated(true);
-        try {
-          setTutorialOpen(
-            window.localStorage.getItem(TUTORIAL_STORAGE_KEY) !== "complete",
-          );
-        } catch {
-          setTutorialOpen(true);
-        }
-      });
+      .finally(() => active && setHydrated(true));
     return () => {
       active = false;
     };
@@ -406,10 +458,18 @@ export default function Home() {
     [state.specimens],
   );
 
-  const exportData = useMemo(
-    () => ({ events: state.events, specimens: state.specimens }),
-    [state.events, state.specimens],
-  );
+  const exportData = useMemo(() => {
+    const events = includeExamples
+      ? state.events
+      : state.events.filter((event) => !event.isExample);
+    const eventIds = new Set(events.map((event) => event.id));
+    const specimens = state.specimens.filter(
+      (specimen) =>
+        eventIds.has(specimen.eventId) &&
+        (includeExamples || !specimen.isExample),
+    );
+    return { events, specimens };
+  }, [includeExamples, state]);
 
   function navigate(view: ViewName) {
     setActiveView(view);
@@ -421,7 +481,6 @@ export default function Home() {
     setEditingTripId(null);
     setTripDraft(emptyTrip());
     setTripModal(true);
-    if (tutorialOpen && tutorialStep === 0) setTutorialStep(1);
   }
 
   function openEditTrip(trip: FieldTrip) {
@@ -463,7 +522,6 @@ export default function Home() {
       }));
       setSelectedTripId(id);
       setNotice(`${fieldTrip.name} created. Add the first collecting event.`);
-      if (tutorialOpen && tutorialStep === 2) setTutorialStep(3);
     }
     setTripModal(false);
   }
@@ -501,7 +559,6 @@ export default function Home() {
     });
     setEventFiles([]);
     setEventModal(true);
-    if (tutorialOpen && tutorialStep === 3) setTutorialStep(4);
     void captureGps("automatic");
   }
 
@@ -839,7 +896,6 @@ export default function Home() {
       }));
       setSelectedEventId(id);
       setNotice(`${id} created. Add specimens or a lot now.`);
-      if (tutorialOpen && tutorialStep === 6) setTutorialStep(7);
     }
     setEventModal(false);
     setEventFiles([]);
@@ -1008,6 +1064,23 @@ export default function Home() {
     }));
   }
 
+  function removeExamples() {
+    const exampleIds = new Set(
+      state.events.filter((event) => event.isExample).map((event) => event.id),
+    );
+    setState((current) => ({
+      ...current,
+      trips: current.trips.filter((trip) => !trip.isExample),
+      events: current.events.filter((event) => !event.isExample),
+      specimens: current.specimens.filter(
+        (specimen) => !specimen.isExample && !exampleIds.has(specimen.eventId),
+      ),
+    }));
+    if (selectedTrip?.isExample) setSelectedTripId(null);
+    setSelectedEventId(null);
+    setNotice("Example records removed.");
+  }
+
   async function eraseEverything() {
     if (
       !window.confirm(
@@ -1063,47 +1136,6 @@ export default function Home() {
     if (choice.outcome === "accepted") setNotice("EntoField installed.");
   }
 
-  function completeTutorial() {
-    try {
-      window.localStorage.setItem(TUTORIAL_STORAGE_KEY, "complete");
-    } catch {
-      // The guide can still be dismissed when private storage is unavailable.
-    }
-    setTutorialOpen(false);
-    setTutorialStep(0);
-  }
-
-  function showTutorial() {
-    setTripModal(false);
-    setEventModal(false);
-    setSpecimenModal(false);
-    setSelectedTripId(null);
-    setSelectedEventId(null);
-    setActiveView("events");
-    setTutorialStep(0);
-    setTutorialOpen(true);
-  }
-
-  function advanceTutorial() {
-    if (tutorialStep === 0) {
-      openNewTrip();
-      return;
-    }
-    if (tutorialStep === 1 && tripDraft.name.trim()) {
-      setTutorialStep(2);
-      return;
-    }
-    if (tutorialStep === 4) {
-      setTutorialStep(5);
-      return;
-    }
-    if (tutorialStep === 5) {
-      setTutorialStep(6);
-      return;
-    }
-    if (tutorialStep === 7) completeTutorial();
-  }
-
   const entoRows = buildEntoLabelRows(
     exportData.events,
     exportData.specimens,
@@ -1116,20 +1148,11 @@ export default function Home() {
   return (
     <div className="app-shell">
       <aside className="side-navigation" aria-label="Main navigation">
-        <button
-          className="brand"
-          onClick={() => navigate("events")}
-          aria-label="Go to Field trips"
-        >
-          <Image
-            className="brand-logo"
-            src="/brand/entofield-logo-ink.png"
-            alt=""
-            width={903}
-            height={489}
-            priority
-            unoptimized
-          />
+        <button className="brand" onClick={() => navigate("events")}>
+          <span className="brand-mark">
+            <Bug aria-hidden="true" />
+          </span>
+          <span>EntoField</span>
         </button>
         <nav className="navigation-list">
           {navigation.map((item) => {
@@ -1150,9 +1173,9 @@ export default function Home() {
           })}
         </nav>
         <div className="sidebar-stats">
-          <span>{formatCount(state.trips.length, "field trip")}</span>
-          <span>{formatCount(state.events.length, "event")}</span>
-          <span>{formatCount(totalIndividuals, "individual")}</span>
+          <span>{state.trips.length} field trips</span>
+          <span>{state.events.length} events</span>
+          <span>{totalIndividuals} individuals</span>
         </div>
         <div className="sidebar-flourish" aria-hidden="true">
           <Leaf />
@@ -1163,20 +1186,6 @@ export default function Home() {
 
       <main className="main-area">
         <header className="utility-header">
-          <button
-            className="mobile-brand"
-            onClick={() => navigate("events")}
-            aria-label="Go to Field trips"
-          >
-            <Image
-              src="/brand/entofield-logo-ink.png"
-              alt=""
-              width={903}
-              height={489}
-              priority
-              unoptimized
-            />
-          </button>
           <button
             className={`status-chip ${online ? "" : "is-offline"}`}
             onClick={() =>
@@ -1264,6 +1273,8 @@ export default function Home() {
             <ExportView
               eventCount={exportData.events.length}
               rowCount={exportData.specimens.length}
+              includeExamples={includeExamples}
+              onIncludeExamples={setIncludeExamples}
               disabled={!entoRows.length}
               busy={exportBusy}
               onXlsx={() =>
@@ -1282,11 +1293,12 @@ export default function Home() {
           {activeView === "settings" && (
             <SettingsView
               preferences={state.preferences}
+              hasExamples={state.events.some((event) => event.isExample)}
               installAvailable={Boolean(installPrompt)}
               onPreferences={updatePreferences}
               onInstall={() => void installApp()}
               onBackup={downloadBackup}
-              onShowTutorial={showTutorial}
+              onRemoveExamples={removeExamples}
               onErase={() => void eraseEverything()}
             />
           )}
@@ -1310,15 +1322,6 @@ export default function Home() {
           );
         })}
       </nav>
-
-      {tutorialOpen && (
-        <GuidedTour
-          step={tutorialStep}
-          canAdvance={tutorialStep !== 1 || Boolean(tripDraft.name.trim())}
-          onAdvance={advanceTutorial}
-          onSkip={completeTutorial}
-        />
-      )}
 
       {tripModal && (
         <TripModal
@@ -1415,240 +1418,6 @@ function individualCount(records: SpecimenRecord[], eventIds: Set<string>) {
   );
 }
 
-function formatCount(value: number, singular: string, plural = `${singular}s`) {
-  return `${value} ${value === 1 ? singular : plural}`;
-}
-
-const guidedTourSteps: ReadonlyArray<{
-  target: string;
-  eyebrow: string;
-  title: string;
-  description: string;
-  action?: string;
-}> = [
-  {
-    target: "new-trip",
-    eyebrow: "Step 1 · Field trip",
-    title: "Start here",
-    description:
-      "A field trip keeps all collecting points from one excursion together. Tap the highlighted button.",
-    action: "Open trip form",
-  },
-  {
-    target: "trip-name",
-    eyebrow: "Step 2 · Name it",
-    title: "Give the day a name",
-    description:
-      "Type a name you will recognise later. Dates, destination and participants stay editable.",
-    action: "Next",
-  },
-  {
-    target: "trip-create",
-    eyebrow: "Step 3 · Save",
-    title: "Create the field trip",
-    description:
-      "Tap the highlighted button when the trip details are ready.",
-  },
-  {
-    target: "new-event",
-    eyebrow: "Step 4 · Collecting point",
-    title: "Add the first point",
-    description:
-      "Each stop along the route becomes its own event with GPS, habitat, method and material.",
-  },
-  {
-    target: "event-capture",
-    eyebrow: "Step 5 · Fast capture",
-    title: "Let the phone help",
-    description:
-      "Use phone GPS, start from a photograph, or add a weather estimate. Everything remains editable.",
-    action: "Continue",
-  },
-  {
-    target: "event-details",
-    eyebrow: "Step 6 · Field notes",
-    title: "Add what matters",
-    description:
-      "Record locality, collector, method, habitat and host. Only the date is required.",
-    action: "Next",
-  },
-  {
-    target: "event-create",
-    eyebrow: "Step 7 · Save the point",
-    title: "Create the event",
-    description:
-      "Tap the highlighted button. Its field data will be inherited by every specimen and lot you add.",
-  },
-  {
-    target: "add-material",
-    eyebrow: "Step 8 · Collected material",
-    title: "Now add specimens or lots",
-    description:
-      "These buttons add material. Collection labels are available just above—even before specimens are entered.",
-    action: "Finish tour",
-  },
-];
-
-type TourTargetRect = {
-  top: number;
-  left: number;
-  width: number;
-  height: number;
-};
-
-function GuidedTour({
-  step,
-  canAdvance,
-  onAdvance,
-  onSkip,
-}: {
-  step: number;
-  canAdvance: boolean;
-  onAdvance: () => void;
-  onSkip: () => void;
-}) {
-  const current = guidedTourSteps[step] ?? guidedTourSteps[0];
-  const [targetRect, setTargetRect] = useState<TourTargetRect | null>(null);
-
-  useEffect(() => {
-    let disposed = false;
-    let frame = 0;
-    const timers: number[] = [];
-
-    const update = () => {
-      if (disposed) return;
-      const candidates = Array.from(
-        document.querySelectorAll<HTMLElement>(`[data-tour="${current.target}"]`),
-      );
-      const target = candidates.find((element) => {
-        const rect = element.getBoundingClientRect();
-        const style = window.getComputedStyle(element);
-        return rect.width > 0 && rect.height > 0 && style.visibility !== "hidden";
-      });
-      if (!target) {
-        setTargetRect(null);
-        return;
-      }
-      const rect = target.getBoundingClientRect();
-      setTargetRect({
-        top: Math.max(8, rect.top - 8),
-        left: Math.max(8, rect.left - 8),
-        width: Math.min(window.innerWidth - 16, rect.width + 16),
-        height: Math.min(window.innerHeight - 16, rect.height + 16),
-      });
-    };
-
-    const reveal = () => {
-      const target = document.querySelector<HTMLElement>(
-        `[data-tour="${current.target}"]`,
-      );
-      target?.scrollIntoView({ behavior: "smooth", block: "center" });
-      frame = window.requestAnimationFrame(update);
-      timers.push(window.setTimeout(update, 180));
-      timers.push(window.setTimeout(update, 420));
-    };
-
-    reveal();
-    window.addEventListener("resize", update);
-    window.addEventListener("scroll", update, true);
-    return () => {
-      disposed = true;
-      window.cancelAnimationFrame(frame);
-      timers.forEach((timer) => window.clearTimeout(timer));
-      window.removeEventListener("resize", update);
-      window.removeEventListener("scroll", update, true);
-    };
-  }, [current.target]);
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onSkip();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onSkip]);
-
-  const viewportWidth = typeof window === "undefined" ? 390 : window.innerWidth;
-  const viewportHeight = typeof window === "undefined" ? 844 : window.innerHeight;
-  const tooltipWidth = Math.min(360, viewportWidth - 24);
-  const estimatedTooltipHeight = 235;
-  const tooltipLeft = targetRect
-    ? Math.max(
-        12,
-        Math.min(
-          viewportWidth - tooltipWidth - 12,
-          targetRect.left + targetRect.width / 2 - tooltipWidth / 2,
-        ),
-      )
-    : Math.max(12, (viewportWidth - tooltipWidth) / 2);
-  const tooltipTop = targetRect
-    ? targetRect.top + targetRect.height + estimatedTooltipHeight + 16 < viewportHeight
-      ? targetRect.top + targetRect.height + 16
-      : Math.max(12, targetRect.top - estimatedTooltipHeight - 16)
-    : Math.max(12, (viewportHeight - estimatedTooltipHeight) / 2);
-
-  return (
-    <div className="guided-tour-layer" role="presentation">
-      {targetRect ? (
-        <div
-          className="guided-tour-spotlight"
-          style={{
-            top: targetRect.top,
-            left: targetRect.left,
-            width: targetRect.width,
-            height: targetRect.height,
-          }}
-          aria-hidden="true"
-        />
-      ) : (
-        <div className="guided-tour-dimmer" aria-hidden="true" />
-      )}
-
-      <section
-        className="guided-tour-tip"
-        style={{ top: tooltipTop, left: tooltipLeft, width: tooltipWidth }}
-        role="dialog"
-        aria-live="polite"
-        aria-labelledby="guided-tour-title"
-        aria-describedby="guided-tour-description"
-      >
-        <div className="guided-tour-tip-topline">
-          <span>{current.eyebrow}</span>
-          <button onClick={onSkip} aria-label="Skip tutorial">
-            <X aria-hidden="true" />
-          </button>
-        </div>
-        <h2 id="guided-tour-title">{current.title}</h2>
-        <p id="guided-tour-description">{current.description}</p>
-        <div className="guided-tour-tip-footer">
-          <button className="text-button" onClick={onSkip}>
-            Skip
-          </button>
-          <span className="guided-tour-progress">
-            {step + 1} / {guidedTourSteps.length}
-          </span>
-          {current.action ? (
-            <button
-              className="primary-button compact"
-              onClick={onAdvance}
-              disabled={!canAdvance}
-            >
-              {current.action} <ArrowRight aria-hidden="true" />
-            </button>
-          ) : (
-            <span className="guided-tour-tap">
-              Tap highlighted <ArrowRight aria-hidden="true" />
-            </span>
-          )}
-        </div>
-        {!canAdvance && (
-          <p className="guided-tour-requirement">Type a trip name to continue.</p>
-        )}
-      </section>
-    </div>
-  );
-}
-
 function TripsView({
   trips,
   events,
@@ -1677,7 +1446,7 @@ function TripsView({
             Keep every collecting point together as one mapped field day.
           </p>
         </div>
-        <button className="primary-button" onClick={onNewTrip} data-tour="new-trip">
+        <button className="primary-button" onClick={onNewTrip}>
           <Plus aria-hidden="true" />
           New field trip
         </button>
@@ -1686,12 +1455,11 @@ function TripsView({
       {!orderedTrips.length && !unassigned.length ? (
         <div className="empty-state trip-empty-state">
           <Image
-            src="/brand/entofield-fly-label-ink.png"
+            src="/field-illustration.png"
             alt=""
-            width={903}
-            height={330}
+            width={1536}
+            height={1152}
             priority
-            unoptimized
           />
           <p className="eyebrow">Ready for an excursion</p>
           <h2>Start a trip, then add collecting points as you go.</h2>
@@ -1699,7 +1467,7 @@ function TripsView({
             Each point keeps its own GPS, habitat, method, weather and specimens,
             while the trip keeps them together on one map.
           </p>
-          <button className="primary-button" onClick={onNewTrip} data-tour="new-trip">
+          <button className="primary-button" onClick={onNewTrip}>
             <Route aria-hidden="true" /> Start first field trip
           </button>
         </div>
@@ -1727,16 +1495,16 @@ function TripsView({
                   </span>
                   <span className="trip-card-content">
                     <span className="sample-label">
-                      {trip.region || "Field trip"}
+                      {trip.isExample ? "Example field trip" : trip.region || "Field trip"}
                     </span>
                     <strong>{trip.name}</strong>
                     <span className="trip-date">
                       <CalendarDays aria-hidden="true" /> {formatTripDates(trip)}
                     </span>
                     <span className="trip-metrics">
-                      <span>{formatCount(tripEvents.length, "event")}</span>
+                      <span>{tripEvents.length} events</span>
                       <span>{mapped} mapped</span>
-                      <span>{formatCount(individuals, "individual")}</span>
+                      <span>{individuals} individuals</span>
                     </span>
                     <span className="trip-open">
                       Open field trip <ArrowRight aria-hidden="true" />
@@ -1763,15 +1531,13 @@ function TripsView({
                     Older records that are not inside a field trip yet
                   </span>
                   <span className="trip-metrics">
-                    <span>{formatCount(unassigned.length, "event")}</span>
+                    <span>{unassigned.length} events</span>
                     <span>
-                      {formatCount(
-                        individualCount(
-                          specimens,
-                          new Set(unassigned.map((event) => event.id)),
-                        ),
-                        "individual",
-                      )}
+                      {individualCount(
+                        specimens,
+                        new Set(unassigned.map((event) => event.id)),
+                      )}{" "}
+                      individuals
                     </span>
                   </span>
                   <span className="trip-open">
@@ -1849,8 +1615,8 @@ function TripView({
                 <CalendarDays aria-hidden="true" /> {formatTripDates(trip)}
               </span>
             )}
-            <span>{formatCount(events.length, "event")}</span>
-            <span>{formatCount(individuals, "individual")}</span>
+            <span>{events.length} events</span>
+            <span>{individuals} individuals</span>
           </p>
         </div>
         <div className="heading-actions">
@@ -1891,7 +1657,7 @@ function TripView({
           onSelectEvent={focusFromMap}
           onOpenEvent={onSelectEvent}
         />
-        <button className="map-new-event" onClick={onNewEvent} data-tour="new-event">
+        <button className="map-new-event" onClick={onNewEvent}>
           <Plus aria-hidden="true" /> New event
         </button>
       </div>
@@ -1963,7 +1729,7 @@ function TripView({
                   <div className="trip-event-tags">
                     {event.method && <span>{event.method}</span>}
                     {event.habitat && <span>{event.habitat}</span>}
-                    <span>{formatCount(count, "individual")}</span>
+                    <span>{count} individuals</span>
                   </div>
                   <button
                     className="trip-event-open"
@@ -2334,7 +2100,7 @@ function EventDetail({
       <div className="detail-heading">
         <div>
           <p className="eyebrow">
-            Collecting event
+            {event.isExample ? "Example collecting event" : "Collecting event"}
             {event.name ? ` · ${event.id}` : ""}
           </p>
           <h1>{event.name || event.id}</h1>
@@ -2406,7 +2172,7 @@ function EventDetail({
           <p className="eyebrow">Collected material</p>
           <h2>Specimens and lots</h2>
         </div>
-        <div className="record-actions" data-tour="add-material">
+        <div className="record-actions">
           <button className="secondary-button compact" onClick={onAddLot}>
             <Package aria-hidden="true" /> Add lot
           </button>
@@ -2456,7 +2222,7 @@ function EventDetail({
                 <h3>{record.scientificName || "Identification pending"}</h3>
                 <p>
                   {record.recordType === "lot"
-                    ? `Lot · ${formatCount(record.quantity, "individual")}`
+                    ? `Lot · ${record.quantity} individuals`
                     : "Individual specimen"}
                   {record.lifeStage ? ` · ${record.lifeStage}` : ""}
                   {record.sex ? ` · ${record.sex}` : ""}
@@ -2577,6 +2343,8 @@ function SpecimensView({
 function ExportView({
   eventCount,
   rowCount,
+  includeExamples,
+  onIncludeExamples,
   disabled,
   busy,
   onXlsx,
@@ -2586,6 +2354,8 @@ function ExportView({
 }: {
   eventCount: number;
   rowCount: number;
+  includeExamples: boolean;
+  onIncludeExamples: (value: boolean) => void;
   disabled: boolean;
   busy: boolean;
   onXlsx: () => void;
@@ -2605,7 +2375,7 @@ function ExportView({
         <div>
           <p className="eyebrow">Ready for EntoLabel</p>
           <h2>
-            {formatCount(rowCount, "row")} from {formatCount(eventCount, "event")}
+            {rowCount} rows from {eventCount} events
           </h2>
           <p>
             Each specimen row receives its event GPS, date, locality, collector,
@@ -2614,6 +2384,15 @@ function ExportView({
         </div>
         <FileSpreadsheet aria-hidden="true" />
       </div>
+
+      <label className="checkbox-row">
+        <input
+          type="checkbox"
+          checked={includeExamples}
+          onChange={(event) => onIncludeExamples(event.target.checked)}
+        />
+        Include the pink example event in exports
+      </label>
 
       <div className="export-grid">
         <ExportCard
@@ -2648,7 +2427,8 @@ function ExportView({
       </div>
       {disabled && (
         <p className="form-hint">
-          Add a specimen or lot to a collecting event to enable exports.
+          Add a specimen row, or temporarily include the example event, to test
+          an export.
         </p>
       )}
     </section>
@@ -2688,19 +2468,21 @@ function ExportCard({
 
 function SettingsView({
   preferences,
+  hasExamples,
   installAvailable,
   onPreferences,
   onInstall,
   onBackup,
-  onShowTutorial,
+  onRemoveExamples,
   onErase,
 }: {
   preferences: AppState["preferences"];
+  hasExamples: boolean;
   installAvailable: boolean;
   onPreferences: (changes: Partial<AppState["preferences"]>) => void;
   onInstall: () => void;
   onBackup: () => void;
-  onShowTutorial: () => void;
+  onRemoveExamples: () => void;
   onErase: () => void;
 }) {
   return (
@@ -2737,21 +2519,9 @@ function SettingsView({
             />
           </label>
           <p className="form-hint">
-            Event IDs look like {preferences.idPrefix || "EF"}-20260730-001.
+            New event example: {preferences.idPrefix || "EF"}-20260730-001.
             Collector is optional; recently used names are remembered automatically.
           </p>
-        </article>
-
-        <article className="settings-card">
-          <p className="eyebrow">Field guide</p>
-          <h2>Need a quick refresher?</h2>
-          <p>
-            Reopen the guided walkthrough. It highlights each control while you
-            create a trip and its first collecting point.
-          </p>
-          <button className="secondary-button compact" onClick={onShowTutorial}>
-            <Route aria-hidden="true" /> Open tutorial
-          </button>
         </article>
 
         <article className="settings-card accent">
@@ -2794,6 +2564,11 @@ function SettingsView({
           <p className="eyebrow">Clean up</p>
           <h2>Local data</h2>
           <div className="danger-actions">
+            {hasExamples && (
+              <button className="secondary-button compact" onClick={onRemoveExamples}>
+                Remove example
+              </button>
+            )}
             <button className="danger-button" onClick={onErase}>
               <Trash2 aria-hidden="true" /> Delete everything
             </button>
@@ -2845,7 +2620,6 @@ function TripModal({
               <input
                 required
                 autoFocus
-                data-tour="trip-name"
                 value={draft.name}
                 onChange={(event) => patch({ name: event.target.value })}
                 placeholder="e.g. Rigi BioBlitz"
@@ -2907,7 +2681,7 @@ function TripModal({
             <button type="button" className="secondary-button" onClick={onClose}>
               Cancel
             </button>
-            <button type="submit" className="primary-button" data-tour="trip-create">
+            <button type="submit" className="primary-button">
               <Check aria-hidden="true" />
               {editing ? "Save changes" : "Create field trip"}
             </button>
@@ -2964,7 +2738,7 @@ function EventModal({
           </button>
         </div>
         <form onSubmit={onSubmit}>
-          <div className="quick-capture" data-tour="event-capture">
+          <div className="quick-capture">
             <button
               type="button"
               onClick={onGps}
@@ -2988,11 +2762,11 @@ function EventModal({
             <label>
               <Camera aria-hidden="true" />
               <strong>{photoBusy ? "Reading photo…" : "Create from photo"}</strong>
-              <span>EXIF GPS; phone GPS for new photos</span>
+              <span>Photo Library or Camera · reads EXIF GPS</span>
               <input
                 type="file"
                 accept="image/*"
-                capture="environment"
+                aria-label="Choose a photograph from the Photo Library or Camera"
                 disabled={photoBusy}
                 onChange={(event) => onFiles(event.target.files, true)}
               />
@@ -3036,7 +2810,7 @@ function EventModal({
             </div>
           )}
 
-          <div className="form-grid" data-tour="event-details">
+          <div className="form-grid">
             <label className="field span-2">
               <span>Event name</span>
               <input
@@ -3242,7 +3016,7 @@ function EventModal({
             <button type="button" className="secondary-button" onClick={onClose}>
               Cancel
             </button>
-            <button type="submit" className="primary-button" data-tour="event-create">
+            <button type="submit" className="primary-button">
               <Check aria-hidden="true" />
               {editing ? "Save changes" : "Create event"}
             </button>

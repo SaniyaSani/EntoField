@@ -11,13 +11,13 @@ specimen rows.
 
 ## What the prototype does
 
-- opens with an interactive guided tour that spotlights the exact controls for
-  creating a trip and collecting point; the tour can be reopened from Settings;
 - creates collecting events with an optional human-readable event name, date/time,
   locality, GPS, uncertainty, altitude, optional collector, method, habitat,
   host/substrate, weather, notes, and photographs;
 - remembers up to 8 recently used collectors locally for one-tap reuse;
 - requests high-accuracy phone GPS automatically when a new event opens;
+- lets mobile users choose an existing photograph from the Photo Library or
+  take a new one when creating an event from a photo;
 - reads capture time and GPS from a photograph's EXIF metadata when available;
 - keeps the event GPS, or requests the current phone position, when iOS provides
   a new photograph without location metadata;

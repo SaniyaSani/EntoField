@@ -1,14 +1,9 @@
-const CACHE_NAME = "entofield-v10-guided-tour-fly-icon";
+const CACHE_NAME = "entofield-v4-swiss-coordinate-labels";
 const APP_SHELL = [
   "/",
   "/manifest.webmanifest",
-  "/entofield-favicon-v3.png",
-  "/entofield-app-icon-v3-192.png",
-  "/entofield-app-icon-v3-512.png",
-  "/entofield-app-icon-v3-1024.png",
-  "/entofield-apple-touch-icon-v3.png",
-  "/brand/entofield-logo-ink.png",
-  "/brand/entofield-fly-label-ink.png",
+  "/icon-192.png",
+  "/icon-512.png",
   "/fonts/DejaVuSans.ttf",
   "/fonts/DejaVuSans-Bold.ttf",
   "/fonts/DejaVuSans-Oblique.ttf",

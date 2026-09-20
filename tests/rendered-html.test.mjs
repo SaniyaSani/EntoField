@@ -30,7 +30,10 @@ test("renders development preview metadata", async () => {
     response.headers.get("content-type") ?? "",
     /^text\/html\b/i,
   );
-  assert.match(await response.text(), developmentPreviewMeta);
+  const html = await response.text();
+  assert.match(html, developmentPreviewMeta);
+  assert.match(html, /src="\/entofield-logo\.png"/);
+  assert.doesNotMatch(html, /_next\/image[^"']*entofield-logo/);
 });
 
 test("event photo picker allows the Photo Library on mobile", async () => {

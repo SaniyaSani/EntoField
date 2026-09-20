@@ -13,3 +13,5 @@
   tiny fly carrying a sketchbook.
 - Lets copy, bulk-specimen, and lot-quantity fields be cleared before a new
   multi-digit value is entered; focusing the field selects the previous value.
+- Loads the desktop wordmark directly instead of using an unavailable image
+  optimizer route, and gives the logo a crisp white backing card.

@@ -3160,9 +3160,11 @@ textarea:focus-visible {
   min-height: 132px;
   justify-content: center;
   overflow: hidden;
-  border-bottom: 2px dashed rgba(31, 26, 23, 0.48);
-  border-radius: 0;
-  padding: 0 4px 16px;
+  border: 2px solid var(--plum);
+  border-radius: 12px;
+  background: var(--white);
+  box-shadow: 4px 5px 0 var(--plum);
+  padding: 8px;
 }
 
 .brand-image {
@@ -3585,7 +3587,10 @@ h3,
   .utility-header::before {
     width: 126px;
     height: 54px;
-    background: url("/entofield-logo.png") center / contain no-repeat;
+    border: 2px solid var(--plum);
+    border-radius: 9px;
+    background: var(--white) url("/entofield-logo.png") center / contain no-repeat;
+    box-shadow: 3px 4px 0 var(--plum);
     content: "";
   }
 

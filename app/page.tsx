@@ -1155,6 +1155,7 @@ export default function Home() {
             alt="EntoField"
             width={1120}
             height={700}
+            unoptimized
             priority
           />
         </button>
@@ -1463,6 +1464,7 @@ function TripsView({
             alt=""
             width={1536}
             height={1152}
+            unoptimized
             priority
           />
           <p className="eyebrow">Ready for an excursion</p>

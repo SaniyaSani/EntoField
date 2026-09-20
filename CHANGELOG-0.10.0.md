@@ -9,3 +9,7 @@
 - Brings the same workflow to a single collecting event and a whole field trip.
 - Preserves the Field Ink interface, original EntoField branding, offline PWA,
   and Photo Library or Camera picker from 0.9.2.
+- Restores the walking-fly artwork as the installed app icon instead of the
+  tiny fly carrying a sketchbook.
+- Lets copy, bulk-specimen, and lot-quantity fields be cleared before a new
+  multi-digit value is entered; focusing the field selects the previous value.

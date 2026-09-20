@@ -2200,8 +2200,10 @@ function EventDetail({
             type="number"
             min="1"
             max="200"
-            value={bulkCount}
+            value={bulkCount || ""}
+            onFocus={(event) => event.currentTarget.select()}
             onChange={(event) => onBulkCount(Number(event.target.value))}
+            onBlur={() => bulkCount < 1 && onBulkCount(1)}
           />
         </label>
         <button className="continue-button compact" onClick={onAddBulk}>
@@ -3093,8 +3095,10 @@ function SpecimenModal({
                   required
                   type="number"
                   min="2"
-                  value={draft.quantity}
+                  value={draft.quantity || ""}
+                  onFocus={(event) => event.currentTarget.select()}
                   onChange={(event) => patch({ quantity: Number(event.target.value) })}
+                  onBlur={() => draft.quantity < 2 && patch({ quantity: 2 })}
                 />
               </label>
             )}

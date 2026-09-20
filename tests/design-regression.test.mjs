@@ -16,6 +16,8 @@ test("keeps the hand-drawn EntoField identity on the latest feature build", asyn
   assert.match(css, /--cream: #f4efe4/);
   assert.match(css, /box-shadow: 6px 7px 0/);
   assert.equal(JSON.parse(manifest).theme_color, "#1F1A17");
+  assert.equal(JSON.parse(manifest).icons[0].src, "/entofield-icon.png");
+  assert.equal(JSON.parse(manifest).icons[0].sizes, "1254x1254");
 
   await Promise.all([
     access(new URL("../public/entofield-logo.png", import.meta.url)),

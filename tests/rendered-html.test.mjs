@@ -64,3 +64,16 @@ test("label studio exposes both label types and an exact PDF preview", async () 
   assert.match(source, /Group by label type/);
   assert.match(source, /Keep record pairs/);
 });
+
+test("copy-count fields can be cleared before a replacement number is typed", async () => {
+  const [labelStudio, page] = await Promise.all([
+    readFile(new URL("../app/label-studio.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(labelStudio, /value=\{copiesByEvent\[event\.id\] \|\| ""\}/);
+  assert.match(labelStudio, /value === 0 \? 0/);
+  assert.match(labelStudio, /onBlur=\{\(\) => commitCopies\(event\.id\)\}/);
+  assert.match(page, /value=\{bulkCount \|\| ""\}/);
+  assert.match(page, /value=\{draft\.quantity \|\| ""\}/);
+});

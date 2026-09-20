@@ -9,8 +9,9 @@
   "icons": [
     {
       "src": "/entofield-icon.png",
-      "sizes": "800x800",
-      "type": "image/png"
+      "sizes": "1254x1254",
+      "type": "image/png",
+      "purpose": "any"
     }
   ]
 }

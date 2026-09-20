@@ -203,8 +203,13 @@ export function LabelStudio({
   }
 
   function setCopies(id: string, value: number) {
-    const safeValue = Math.max(1, Math.min(200, Math.floor(value || 1)));
+    if (!Number.isFinite(value) || value < 0) return;
+    const safeValue = value === 0 ? 0 : Math.min(200, Math.floor(value));
     setCopiesByEvent((current) => ({ ...current, [id]: safeValue }));
+  }
+
+  function commitCopies(id: string) {
+    if ((copiesByEvent[id] ?? 0) < 1) setCopies(id, 1);
   }
 
   async function createPdf() {
@@ -288,7 +293,16 @@ export function LabelStudio({
                     {mode !== "determination" && source === "quick" ? (
                       <label className="field trip-label-copies">
                         <span>Copies</span>
-                        <input type="number" min="1" max="200" value={copiesByEvent[event.id] ?? 1} disabled={!selected} onChange={(input) => setCopies(event.id, Number(input.target.value))} />
+                        <input
+                          type="number"
+                          min="1"
+                          max="200"
+                          value={copiesByEvent[event.id] || ""}
+                          disabled={!selected}
+                          onFocus={(input) => input.currentTarget.select()}
+                          onChange={(input) => setCopies(event.id, Number(input.target.value))}
+                          onBlur={() => commitCopies(event.id)}
+                        />
                       </label>
                     ) : (
                       <span className="label-count">{selected ? recordCount : 0} records</span>
@@ -311,7 +325,15 @@ export function LabelStudio({
                 <div><strong>Identical locality labels</strong><span>Useful before the specimens or lots have been entered.</span></div>
                 <label className="field">
                   <span>Copies</span>
-                  <input type="number" min="1" max="200" value={copiesByEvent[orderedEvents[0].id] ?? 1} onChange={(input) => setCopies(orderedEvents[0].id, Number(input.target.value))} />
+                  <input
+                    type="number"
+                    min="1"
+                    max="200"
+                    value={copiesByEvent[orderedEvents[0].id] || ""}
+                    onFocus={(input) => input.currentTarget.select()}
+                    onChange={(input) => setCopies(orderedEvents[0].id, Number(input.target.value))}
+                    onBlur={() => commitCopies(orderedEvents[0].id)}
+                  />
                 </label>
               </div>
             )}

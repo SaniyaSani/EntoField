@@ -1630,11 +1630,11 @@ function TripView({
             disabled={!events.length}
             title={
               events.length
-                ? "Choose events and combine their collection labels"
+                ? "Create, group and preview collection and determination labels"
                 : "Add a collecting event before creating labels"
             }
           >
-            <FileSpreadsheet aria-hidden="true" /> Collection labels
+            <FileSpreadsheet aria-hidden="true" /> Label Studio
           </button>
           {!unassigned && onEditTrip && onDeleteTrip && (
             <>
@@ -2145,8 +2145,8 @@ function EventDetail({
           <p className="eyebrow">EntoLabel built in</p>
           <h2>Label material from this event</h2>
           <p>
-            Collection labels are the fast default. Create identical locality
-            copies now, or one label per recorded specimen or lot.
+            Create collection labels, determination labels, or both together.
+            Group them by type or keep matching record labels side by side.
           </p>
         </div>
         <div className="label-action-buttons">

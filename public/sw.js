@@ -1,4 +1,4 @@
-const CACHE_NAME = "entofield-v4-swiss-coordinate-labels";
+const CACHE_NAME = "entofield-v5-grouped-label-studio";
 const APP_SHELL = [
   "/",
   "/manifest.webmanifest",

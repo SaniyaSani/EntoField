@@ -2031,6 +2031,97 @@ h2 {
   padding: 18px;
 }
 
+.label-studio-modal {
+  width: min(980px, 100%);
+}
+
+.label-mode-control {
+  margin-bottom: 20px;
+}
+
+.label-count-summary {
+  margin-top: 20px;
+}
+
+.label-layout-section {
+  margin-top: 28px;
+  border: 2px solid var(--plum);
+  border-radius: 14px;
+  background: rgba(251, 248, 240, 0.96);
+  box-shadow: 5px 6px 0 rgba(31, 26, 23, 0.96);
+  padding: 20px;
+}
+
+.label-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.label-cutting-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 12px;
+}
+
+.label-choice-grid button {
+  display: grid;
+  min-height: 88px;
+  gap: 5px;
+  align-content: center;
+  border: 2px solid var(--plum);
+  border-radius: 10px;
+  background: var(--white);
+  padding: 13px;
+  color: var(--plum);
+  text-align: left;
+  cursor: pointer;
+}
+
+.label-choice-grid button.is-active {
+  background: var(--pale-green);
+  box-shadow: 3px 4px 0 var(--plum);
+}
+
+.label-choice-grid button:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+
+.label-choice-grid button span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.label-gap-field {
+  width: min(240px, 100%);
+  margin-top: 15px;
+}
+
+.label-pdf-frame {
+  display: block;
+  width: 100%;
+  min-height: 520px;
+  border: 2px solid var(--plum);
+  border-radius: 10px;
+  background: #777;
+}
+
+.label-settings-grid .settings-checkbox {
+  width: auto;
+}
+
+@media (max-width: 700px) {
+  .label-cutting-grid,
+  .label-choice-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .label-pdf-frame {
+    min-height: 420px;
+  }
+}
+
 .settings-checkbox {
   align-self: end;
   min-height: 52px;

@@ -5,6 +5,7 @@ import type {
   LabelJob,
   LabelLine,
   LabelLineStyle,
+  LabelPageOptions,
   LabelSettings,
 } from "./labels";
 
@@ -12,7 +13,6 @@ const POINTS_PER_MM = 72 / 25.4;
 const A4_WIDTH = 210 * POINTS_PER_MM;
 const A4_HEIGHT = 297 * POINTS_PER_MM;
 const PAGE_MARGIN = 7 * POINTS_PER_MM;
-const LABEL_GAP = 1.5 * POINTS_PER_MM;
 const INNER_PADDING = 0.45 * POINTS_PER_MM;
 const MINIMUM_FONT_SIZE = 3;
 
@@ -114,10 +114,9 @@ function prepareLabel(
   availableWidth: number,
   availableHeight: number,
 ) {
-  const upperFontSize = Math.max(
-    settings.preferredFontSize,
-    settings.maximumFontSize,
-  );
+  const upperFontSize = settings.autoEnlarge
+    ? Math.max(settings.preferredFontSize, settings.maximumFontSize)
+    : settings.preferredFontSize;
   for (
     let fontSize = upperFontSize;
     fontSize >= MINIMUM_FONT_SIZE;
@@ -153,6 +152,7 @@ function drawLabel(
   fonts: EmbeddedFonts,
   x: number,
   y: number,
+  drawBorder: boolean,
 ): boolean {
   const width = job.settings.widthMm * POINTS_PER_MM;
   const height = job.settings.heightMm * POINTS_PER_MM;
@@ -166,7 +166,7 @@ function drawLabel(
     availableHeight,
   );
 
-  if (job.settings.drawBorders) {
+  if (drawBorder) {
     page.drawRectangle({
       x,
       y,
@@ -182,10 +182,12 @@ function drawLabel(
       Math.max(0, prepared.lines.length - 1) * prepared.lineHeight
     : 0;
   let textY =
-    y +
-    INNER_PADDING +
-    (availableHeight + blockHeight) / 2 -
-    prepared.fontSize;
+    job.settings.verticalAlignment === "balanced"
+      ? y +
+        INNER_PADDING +
+        (availableHeight + blockHeight) / 2 -
+        prepared.fontSize
+      : y + height - INNER_PADDING - prepared.fontSize;
   const minimumY = y + INNER_PADDING - 0.01;
 
   for (const line of prepared.lines) {
@@ -205,6 +207,11 @@ function drawLabel(
 export async function createLabelsPdf(
   jobs: LabelJob[],
   title: string,
+  options: LabelPageOptions = {
+    arrangement: "grouped",
+    cuttingGuideStyle: "shared-grid",
+    cuttingGapMm: 1.5,
+  },
 ): Promise<{ bytes: Uint8Array; overflowCount: number }> {
   if (!jobs.length) throw new Error("There are no labels to create.");
   const document = await PDFDocument.create();
@@ -217,13 +224,28 @@ export async function createLabelsPdf(
   let top = A4_HEIGHT - PAGE_MARGIN;
   let rowHeight = 0;
   let overflowCount = 0;
+  let previousKind = jobs[0]?.kind;
+  const gap =
+    options.cuttingGuideStyle === "double-guides"
+      ? Math.max(0, options.cuttingGapMm) * POINTS_PER_MM
+      : 0;
+  const drawBorder = options.cuttingGuideStyle !== "none";
 
   for (const job of jobs) {
     const width = job.settings.widthMm * POINTS_PER_MM;
     const height = job.settings.heightMm * POINTS_PER_MM;
+    if (
+      options.arrangement === "grouped" &&
+      job.kind !== previousKind &&
+      x > PAGE_MARGIN + 0.01
+    ) {
+      x = PAGE_MARGIN;
+      top -= rowHeight + gap;
+      rowHeight = 0;
+    }
     if (x + width > A4_WIDTH - PAGE_MARGIN + 0.01) {
       x = PAGE_MARGIN;
-      top -= rowHeight + LABEL_GAP;
+      top -= rowHeight + gap;
       rowHeight = 0;
     }
     if (top - height < PAGE_MARGIN) {
@@ -232,9 +254,12 @@ export async function createLabelsPdf(
       top = A4_HEIGHT - PAGE_MARGIN;
       rowHeight = 0;
     }
-    if (!drawLabel(page, job, fonts, x, top - height)) overflowCount += 1;
-    x += width + LABEL_GAP;
+    if (!drawLabel(page, job, fonts, x, top - height, drawBorder)) {
+      overflowCount += 1;
+    }
+    x += width + gap;
     rowHeight = Math.max(rowHeight, height);
+    previousKind = job.kind;
   }
 
   return { bytes: await document.save(), overflowCount };

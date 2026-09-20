@@ -12,6 +12,7 @@ import {
   makeCollectionLabelJobs,
   makeDeterminationLabelJobs,
   makeMultiEventCollectionLabelJobs,
+  arrangeLabelJobs,
 } from "../lib/labels.ts";
 
 const event = {
@@ -164,6 +165,7 @@ test("determination jobs remain separate and skip unidentified material", () => 
     options: {
       shortenIdentifierNames: true,
       identificationYear: "2026",
+      includeSpecimenIdentifier: true,
     },
     settings: DEFAULT_DETERMINATION_LABEL_SETTINGS,
   });
@@ -171,11 +173,61 @@ test("determination jobs remain separate and skip unidentified material", () => 
   assert.deepEqual(buildDeterminationLabelLines(records[0], {
     shortenIdentifierNames: true,
     identificationYear: "2026",
+    includeSpecimenIdentifier: true,
   }), [
     { text: "EF-20260831-001-S01", style: "bold" },
     { text: "Lucilia cf. sericata", style: "italic" },
     { text: "det. S. Sagutdinova 2026", style: "regular" },
   ]);
+});
+
+test("groups label types or keeps matching record labels together", () => {
+  const collectionJobs = makeCollectionLabelJobs({
+    event,
+    records,
+    source: "records",
+    copies: 1,
+    includeIdentifier: true,
+    options: {
+      includeCoordinates: true,
+      coordinateFormat: "wgs84",
+      shortenCollectorNames: true,
+      dateFormat: "roman",
+    },
+    settings: DEFAULT_COLLECTION_LABEL_SETTINGS,
+  });
+  const determinationJobs = makeDeterminationLabelJobs({
+    records,
+    options: {
+      shortenIdentifierNames: true,
+      identificationYear: "2026",
+      includeSpecimenIdentifier: true,
+    },
+    settings: DEFAULT_DETERMINATION_LABEL_SETTINGS,
+  });
+
+  assert.deepEqual(
+    arrangeLabelJobs(collectionJobs, determinationJobs, "grouped").map((job) => job.kind),
+    ["collection", "collection", "determination"],
+  );
+  assert.deepEqual(
+    arrangeLabelJobs(collectionJobs, determinationJobs, "paired").map((job) => [job.kind, job.sourceKey]),
+    [
+      ["collection", records[0].id],
+      ["determination", records[0].id],
+      ["collection", records[1].id],
+    ],
+  );
+});
+
+test("can omit the specimen ID from determination labels", () => {
+  const lines = buildDeterminationLabelLines(records[0], {
+    shortenIdentifierNames: true,
+    identificationYear: "2026",
+    includeSpecimenIdentifier: false,
+  });
+  assert.equal(lines.some((line) => line.text === records[0].id), false);
+  assert.equal(lines[0].style, "italic");
 });
 
 test("creates a readable A4 PDF with embedded Unicode fonts", async () => {
@@ -202,7 +254,11 @@ test("creates a readable A4 PDF with embedded Unicode fonts", async () => {
       settings: DEFAULT_COLLECTION_LABEL_SETTINGS,
     });
     const { createLabelsPdf } = await import("../lib/labels-pdf.ts");
-    const result = await createLabelsPdf(jobs, "Combined field trip labels test");
+    const result = await createLabelsPdf(jobs, "Combined field trip labels test", {
+      arrangement: "grouped",
+      cuttingGuideStyle: "shared-grid",
+      cuttingGapMm: 1.5,
+    });
     assert.equal(result.overflowCount, 0);
     assert.equal(jobs.length, 24);
     assert.ok(result.bytes.byteLength > 5_000);
@@ -226,6 +282,11 @@ test("creates a readable A4 PDF with embedded Unicode fonts", async () => {
     const swissResult = await createLabelsPdf(
       swissJobs,
       "Swiss LV95 field trip labels test",
+      {
+        arrangement: "grouped",
+        cuttingGuideStyle: "double-guides",
+        cuttingGapMm: 1.5,
+      },
     );
     assert.equal(swissResult.overflowCount, 0);
     assert.equal((await PDFDocument.load(swissResult.bytes)).getPageCount(), 1);

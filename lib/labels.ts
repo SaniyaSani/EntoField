@@ -13,7 +13,19 @@ export type LabelSettings = {
   preferredFontSize: number;
   maximumFontSize: number;
   lineSpacing: number;
-  drawBorders: boolean;
+  autoEnlarge: boolean;
+  verticalAlignment: "balanced" | "top";
+};
+
+export type LabelKind = "collection" | "determination";
+export type LabelMode = LabelKind | "both";
+export type LabelArrangement = "grouped" | "paired";
+export type CuttingGuideStyle = "shared-grid" | "double-guides" | "none";
+
+export type LabelPageOptions = {
+  arrangement: LabelArrangement;
+  cuttingGuideStyle: CuttingGuideStyle;
+  cuttingGapMm: number;
 };
 
 export type CoordinateFormat = "wgs84" | "lv95" | "lv03";
@@ -28,9 +40,12 @@ export type CollectionLabelOptions = {
 export type DeterminationLabelOptions = {
   shortenIdentifierNames: boolean;
   identificationYear: string;
+  includeSpecimenIdentifier: boolean;
 };
 
 export type LabelJob = {
+  kind: LabelKind;
+  sourceKey: string;
   lines: LabelLine[];
   settings: LabelSettings;
 };
@@ -41,7 +56,8 @@ export const DEFAULT_COLLECTION_LABEL_SETTINGS: LabelSettings = {
   preferredFontSize: 5,
   maximumFontSize: 6.5,
   lineSpacing: 1,
-  drawBorders: true,
+  autoEnlarge: true,
+  verticalAlignment: "balanced",
 };
 
 export const DEFAULT_DETERMINATION_LABEL_SETTINGS: LabelSettings = {
@@ -50,7 +66,14 @@ export const DEFAULT_DETERMINATION_LABEL_SETTINGS: LabelSettings = {
   preferredFontSize: 5,
   maximumFontSize: 6.5,
   lineSpacing: 1,
-  drawBorders: true,
+  autoEnlarge: true,
+  verticalAlignment: "balanced",
+};
+
+export const DEFAULT_LABEL_PAGE_OPTIONS: LabelPageOptions = {
+  arrangement: "grouped",
+  cuttingGuideStyle: "shared-grid",
+  cuttingGapMm: 1.5,
 };
 
 const ROMAN_MONTHS = [
@@ -245,7 +268,7 @@ export function buildDeterminationLabelLines(
     .join(" ");
 
   return [
-    clean(specimen.id)
+    options.includeSpecimenIdentifier && clean(specimen.id)
       ? { text: clean(specimen.id), style: "bold" as const }
       : null,
     clean(specimen.scientificName)
@@ -276,6 +299,8 @@ export function makeCollectionLabelJobs({
 }): LabelJob[] {
   if (source === "records") {
     return records.map((record) => ({
+      kind: "collection" as const,
+      sourceKey: record.id,
       lines: buildCollectionLabelLines(
         event,
         includeIdentifier ? record.id : "",
@@ -286,7 +311,9 @@ export function makeCollectionLabelJobs({
   }
 
   const safeCopies = Math.max(1, Math.min(200, Math.floor(copies || 1)));
-  return Array.from({ length: safeCopies }, () => ({
+  return Array.from({ length: safeCopies }, (_, index) => ({
+    kind: "collection" as const,
+    sourceKey: `${event.id}:copy:${index + 1}`,
     lines: buildCollectionLabelLines(
       event,
       includeIdentifier ? event.id : "",
@@ -345,7 +372,39 @@ export function makeDeterminationLabelJobs({
   return records
     .filter((record) => clean(record.scientificName))
     .map((record) => ({
+      kind: "determination" as const,
+      sourceKey: record.id,
       lines: buildDeterminationLabelLines(record, options),
       settings,
     }));
+}
+
+export function arrangeLabelJobs(
+  collectionJobs: LabelJob[],
+  determinationJobs: LabelJob[],
+  arrangement: LabelArrangement,
+): LabelJob[] {
+  if (arrangement === "grouped") {
+    return [...collectionJobs, ...determinationJobs];
+  }
+
+  const determinationsBySource = new Map(
+    determinationJobs.map((job) => [job.sourceKey, job]),
+  );
+  const arranged: LabelJob[] = [];
+  for (const collectionJob of collectionJobs) {
+    arranged.push(collectionJob);
+    const determinationJob = determinationsBySource.get(collectionJob.sourceKey);
+    if (determinationJob) {
+      arranged.push(determinationJob);
+      determinationsBySource.delete(collectionJob.sourceKey);
+    }
+  }
+  for (const determinationJob of determinationJobs) {
+    if (determinationsBySource.has(determinationJob.sourceKey)) {
+      arranged.push(determinationJob);
+      determinationsBySource.delete(determinationJob.sourceKey);
+    }
+  }
+  return arranged;
 }

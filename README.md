@@ -36,9 +36,12 @@ specimen rows.
   continuously filled PDF, with an adjustable copy count for every event;
 - prints collection-label coordinates as WGS84 latitude/longitude, modern Swiss
   LV95, or legacy Swiss LV03 while retaining WGS84 in the stored event data;
-- keeps determination labels behind a separate action and includes only records
-  that already have a scientific name;
-- previews compact labels and downloads a print-ready A4 PDF entirely on-device;
+- opens a unified Label Studio for collection labels, determination labels, or
+  both together while retaining independent size and typography settings;
+- groups labels by type for batch cutting or keeps matching collection and
+  determination labels paired by specimen record;
+- offers a shared guillotine grid, spaced double cutting guides, or no guides;
+- renders an exact live A4 preview from the same PDF used for the download;
 - stores event/specimen data and photographs locally in browser IndexedDB;
 - works after installation as a Progressive Web App (PWA);
 - exports EntoLabel-ready `.xlsx` and UTF-8 `.csv` tables;

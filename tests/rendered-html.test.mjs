@@ -50,3 +50,17 @@ test("event photo picker allows the Photo Library on mobile", async () => {
     "capture would force the camera instead of allowing Photo Library selection",
   );
 });
+
+test("label studio exposes both label types and an exact PDF preview", async () => {
+  const source = await readFile(
+    new URL("../app/label-studio.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(source, /Collection \+ determination labels/);
+  assert.match(source, /Single shared grid/);
+  assert.match(source, /Double guides/);
+  assert.match(source, /No guides/);
+  assert.match(source, /Exact A4 label PDF preview/);
+  assert.match(source, /Group by label type/);
+  assert.match(source, /Keep record pairs/);
+});

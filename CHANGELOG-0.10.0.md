@@ -23,3 +23,5 @@
   **Replay tutorial** control in Settings.
 - Removes development-only authentication, preview metadata, and environment
   markers from the distributable source.
+- Changes the beige paper surfaces to clean white while keeping a very faint
+  notebook grid in the main workspace.

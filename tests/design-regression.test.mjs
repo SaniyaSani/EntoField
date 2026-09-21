@@ -13,7 +13,7 @@ test("keeps the hand-drawn EntoField identity on the latest feature build", asyn
   assert.match(page, /> Collection labels/);
   assert.match(page, /Photo Library or Camera/);
   assert.match(css, /EntoField field-notebook theme/);
-  assert.match(css, /--cream: #f4efe4/);
+  assert.match(css, /--cream: #ffffff/);
   assert.match(css, /box-shadow: 6px 7px 0/);
   assert.equal(JSON.parse(manifest).theme_color, "#1F1A17");
   assert.equal(JSON.parse(manifest).icons[0].src, "/entofield-icon-v2.png");

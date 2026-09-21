@@ -15,3 +15,11 @@
   multi-digit value is entered; focusing the field selects the previous value.
 - Loads the desktop wordmark directly instead of using an unavailable image
   optimizer route, and gives the logo a crisp white backing card.
+- Keeps the chosen walking fly in the installed-app icon while removing the
+  specimen label and cord; the versioned icon path avoids stale iOS previews.
+- Replaces the Chalkboard/Comic Sans fallback with a calm monospaced
+  field-label typeface while retaining serif headings.
+- Restores the four-step first-launch guide, remembers dismissal, and adds a
+  **Replay tutorial** control in Settings.
+- Removes development-only authentication, preview metadata, and environment
+  markers from the distributable source.

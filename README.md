@@ -20,6 +20,8 @@ specimen rows.
   take a new one when creating an event from a photo;
 - restores EntoField's hand-drawn field-notebook interface and original fly
   wordmark instead of the older pink-and-plum application shell;
+- opens a four-step guided tour on first launch and lets it be replayed from
+  Settings at any time;
 - reads capture time and GPS from a photograph's EXIF metadata when available;
 - keeps the event GPS, or requests the current phone position, when iOS provides
   a new photograph without location metadata;

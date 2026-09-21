@@ -1,10 +1,10 @@
-const CACHE_NAME = "entofield-v6-walking-fly-and-count-fix";
+const CACHE_NAME = "entofield-v7-icon-font-and-tutorial";
 const APP_SHELL = [
   "/",
   "/manifest.webmanifest",
   "/icon-192.png",
   "/icon-512.png",
-  "/entofield-icon.png",
+  "/entofield-icon-v2.png",
   "/fonts/DejaVuSans.ttf",
   "/fonts/DejaVuSans-Bold.ttf",
   "/fonts/DejaVuSans-Oblique.ttf",

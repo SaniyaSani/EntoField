@@ -81,6 +81,34 @@ const navigation: Array<{
 ];
 
 const UNASSIGNED_TRIP = "__unassigned__";
+const TUTORIAL_STORAGE_KEY = "entofield.tutorial.v1";
+
+const tutorialSteps = [
+  {
+    eyebrow: "1 of 4 · Field trips",
+    title: "Start with the excursion",
+    body: "Create one field trip for a day or expedition. Every collecting point, photograph and specimen will stay grouped inside it.",
+    nextLabel: "Show specimens",
+  },
+  {
+    eyebrow: "2 of 4 · Specimens",
+    title: "Find every specimen together",
+    body: "This view gathers individual specimens and lots from all collecting events, while keeping the link back to each place and date.",
+    nextLabel: "Show export",
+  },
+  {
+    eyebrow: "3 of 4 · Export",
+    title: "Take your records with you",
+    body: "Export EntoLabel tables, Darwin Core data, a complete ZIP with photographs, or a local JSON backup before changing devices.",
+    nextLabel: "Show settings",
+  },
+  {
+    eyebrow: "4 of 4 · Settings",
+    title: "The guide is always here",
+    body: "Install EntoField, set your collector defaults and replay this tour whenever you need it. Your field data remains on this device.",
+    nextLabel: "Start a field trip",
+  },
+] as const;
 
 const exampleTrip: FieldTrip = {
   id: "FT-20260730-001",
@@ -375,6 +403,7 @@ export default function Home() {
     eventId: string;
   } | null>(null);
   const [tripLabelModal, setTripLabelModal] = useState<string | null>(null);
+  const [tutorialStep, setTutorialStep] = useState<number | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -397,6 +426,26 @@ export default function Home() {
       setNotice("A change could not be saved locally. Please export a backup."),
     );
   }, [state, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    let shouldShow = false;
+    try {
+      shouldShow =
+        window.localStorage.getItem(TUTORIAL_STORAGE_KEY) !== "complete";
+    } catch {
+      shouldShow = true;
+    }
+    if (!shouldShow) return;
+
+    const frame = window.requestAnimationFrame(() => {
+        setActiveView("events");
+        setSelectedTripId(null);
+        setSelectedEventId(null);
+        setTutorialStep(0);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [hydrated]);
 
   useEffect(() => {
     const updateStatus = () => setOnline(navigator.onLine);
@@ -475,6 +524,43 @@ export default function Home() {
     setActiveView(view);
     setSelectedEventId(null);
     setSelectedTripId(null);
+  }
+
+  function showTutorialStep(step: number) {
+    const views: ViewName[] = ["events", "specimens", "export", "settings"];
+    setTutorialStep(step);
+    navigate(views[step]);
+  }
+
+  function startTutorial() {
+    showTutorialStep(0);
+  }
+
+  function finishTutorial(openFirstTrip = false) {
+    try {
+      window.localStorage.setItem(TUTORIAL_STORAGE_KEY, "complete");
+    } catch {
+      // The tutorial still closes when private storage is unavailable.
+    }
+    setTutorialStep(null);
+    if (openFirstTrip) {
+      navigate("events");
+      openNewTrip();
+    }
+  }
+
+  function nextTutorialStep() {
+    if (tutorialStep === null) return;
+    if (tutorialStep >= tutorialSteps.length - 1) {
+      finishTutorial(true);
+      return;
+    }
+    showTutorialStep(tutorialStep + 1);
+  }
+
+  function previousTutorialStep() {
+    if (tutorialStep === null || tutorialStep === 0) return;
+    showTutorialStep(tutorialStep - 1);
   }
 
   function openNewTrip() {
@@ -1147,7 +1233,12 @@ export default function Home() {
 
   return (
     <div className="app-shell">
-      <aside className="side-navigation" aria-label="Main navigation">
+      <aside
+        className={`side-navigation ${
+          tutorialStep === 1 || tutorialStep === 2 ? "tour-layer" : ""
+        }`}
+        aria-label="Main navigation"
+      >
         <button className="brand" onClick={() => navigate("events")}>
           <Image
             className="brand-image"
@@ -1167,6 +1258,11 @@ export default function Home() {
                 key={item.id}
                 className={`navigation-item ${
                   activeView === item.id ? "is-active" : ""
+                } ${
+                  (tutorialStep === 1 && item.id === "specimens") ||
+                  (tutorialStep === 2 && item.id === "export")
+                    ? "tour-highlight"
+                    : ""
                 }`}
                 onClick={() => navigate(item.id)}
                 aria-current={activeView === item.id ? "page" : undefined}
@@ -1256,6 +1352,7 @@ export default function Home() {
                 specimens={state.specimens}
                 onNewTrip={openNewTrip}
                 onSelectTrip={setSelectedTripId}
+                tutorialHighlight={tutorialStep === 0}
               />
             ))}
 
@@ -1305,18 +1402,30 @@ export default function Home() {
               onBackup={downloadBackup}
               onRemoveExamples={removeExamples}
               onErase={() => void eraseEverything()}
+              onTutorial={startTutorial}
+              tutorialHighlight={tutorialStep === 3}
             />
           )}
         </div>
       </main>
 
-      <nav className="mobile-navigation" aria-label="Mobile navigation">
+      <nav
+        className={`mobile-navigation ${
+          tutorialStep === 1 || tutorialStep === 2 ? "tour-layer" : ""
+        }`}
+        aria-label="Mobile navigation"
+      >
         {navigation.map((item) => {
           const Icon = item.icon;
           return (
             <button
               key={item.id}
-              className={activeView === item.id ? "is-active" : ""}
+              className={`${activeView === item.id ? "is-active" : ""} ${
+                (tutorialStep === 1 && item.id === "specimens") ||
+                (tutorialStep === 2 && item.id === "export")
+                  ? "tour-highlight"
+                  : ""
+              }`}
               onClick={() => navigate(item.id)}
               aria-label={item.label}
               aria-current={activeView === item.id ? "page" : undefined}
@@ -1327,6 +1436,15 @@ export default function Home() {
           );
         })}
       </nav>
+
+      {tutorialStep !== null && (
+        <GuidedTour
+          step={tutorialStep}
+          onBack={previousTutorialStep}
+          onNext={nextTutorialStep}
+          onSkip={() => finishTutorial(false)}
+        />
+      )}
 
       {tripModal && (
         <TripModal
@@ -1410,6 +1528,60 @@ export default function Home() {
   );
 }
 
+function GuidedTour({
+  step,
+  onBack,
+  onNext,
+  onSkip,
+}: {
+  step: number;
+  onBack: () => void;
+  onNext: () => void;
+  onSkip: () => void;
+}) {
+  const content = tutorialSteps[step] ?? tutorialSteps[0];
+  const finalStep = step === tutorialSteps.length - 1;
+
+  return (
+    <>
+      <div className="tour-overlay" aria-hidden="true" />
+      <section
+        className="tour-card"
+        role="dialog"
+        aria-labelledby="tour-title"
+        aria-describedby="tour-description"
+      >
+        <p className="eyebrow">{content.eyebrow}</p>
+        <h2 id="tour-title">{content.title}</h2>
+        <p id="tour-description">{content.body}</p>
+        <div className="tour-progress" aria-label={`Tutorial step ${step + 1} of ${tutorialSteps.length}`}>
+          {tutorialSteps.map((item, index) => (
+            <span
+              key={item.title}
+              className={index <= step ? "is-active" : ""}
+              aria-hidden="true"
+            />
+          ))}
+        </div>
+        <div className="tour-actions">
+          <button className="text-button" onClick={onSkip}>
+            Skip
+          </button>
+          {step > 0 && (
+            <button className="secondary-button compact" onClick={onBack}>
+              <ArrowLeft aria-hidden="true" /> Back
+            </button>
+          )}
+          <button className="primary-button compact" onClick={onNext} autoFocus>
+            {content.nextLabel}
+            {finalStep ? <Route aria-hidden="true" /> : <ArrowRight aria-hidden="true" />}
+          </button>
+        </div>
+      </section>
+    </>
+  );
+}
+
 function formatTripDates(trip: FieldTrip) {
   return trip.startDate === trip.endDate
     ? trip.startDate
@@ -1429,12 +1601,14 @@ function TripsView({
   specimens,
   onNewTrip,
   onSelectTrip,
+  tutorialHighlight = false,
 }: {
   trips: FieldTrip[];
   events: CollectingEvent[];
   specimens: SpecimenRecord[];
   onNewTrip: () => void;
   onSelectTrip: (id: string) => void;
+  tutorialHighlight?: boolean;
 }) {
   const orderedTrips = [...trips].sort((a, b) =>
     b.startDate.localeCompare(a.startDate),
@@ -1451,7 +1625,10 @@ function TripsView({
             Keep every collecting point together as one mapped field day.
           </p>
         </div>
-        <button className="primary-button" onClick={onNewTrip}>
+        <button
+          className={`primary-button ${tutorialHighlight ? "tour-highlight" : ""}`}
+          onClick={onNewTrip}
+        >
           <Plus aria-hidden="true" />
           New field trip
         </button>
@@ -2483,6 +2660,8 @@ function SettingsView({
   onBackup,
   onRemoveExamples,
   onErase,
+  onTutorial,
+  tutorialHighlight = false,
 }: {
   preferences: AppState["preferences"];
   hasExamples: boolean;
@@ -2492,6 +2671,8 @@ function SettingsView({
   onBackup: () => void;
   onRemoveExamples: () => void;
   onErase: () => void;
+  onTutorial: () => void;
+  tutorialHighlight?: boolean;
 }) {
   return (
     <section>
@@ -2502,6 +2683,22 @@ function SettingsView({
         </div>
       </div>
       <div className="settings-grid">
+        <article
+          className={`settings-card tutorial-settings-card ${
+            tutorialHighlight ? "tour-highlight" : ""
+          }`}
+        >
+          <p className="eyebrow">Quick guide</p>
+          <h2>Tour EntoField again</h2>
+          <p>
+            Revisit the four main parts of the field notebook without changing
+            any of your records.
+          </p>
+          <button className="secondary-button compact" onClick={onTutorial}>
+            Replay tutorial <ArrowRight aria-hidden="true" />
+          </button>
+        </article>
+
         <article className="settings-card">
           <p className="eyebrow">Defaults</p>
           <h2>Save typing in the field</h2>

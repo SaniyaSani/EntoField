@@ -12,13 +12,10 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
     title: "EntoField",
   },
-  other: {
-    "codex-preview": "development",
-  },
   icons: {
-    icon: "/entofield-icon.png",
-    shortcut: "/entofield-icon.png",
-    apple: "/entofield-icon.png",
+    icon: "/entofield-icon-v2.png",
+    shortcut: "/entofield-icon-v2.png",
+    apple: "/entofield-icon-v2.png",
   },
 };
 

@@ -3114,8 +3114,9 @@ h2 {
   --danger: #9d3348;
   --shadow: 7px 8px 0 #241e1a;
   --font-display: Georgia, "Times New Roman", serif;
-  --font-ui: "Chalkboard SE", "Comic Sans MS", "DejaVu Sans", sans-serif;
-  --font-field: "Courier New", Courier, monospace;
+  --font-ui: ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas,
+    "Liberation Mono", "DejaVu Sans Mono", monospace;
+  --font-field: var(--font-ui);
 }
 
 html {
@@ -3555,6 +3556,96 @@ h3,
   color: var(--plum);
 }
 
+.tutorial-settings-card {
+  background: var(--pale-green);
+}
+
+.tour-layer {
+  position: relative;
+  z-index: 82;
+}
+
+.tour-highlight {
+  position: relative;
+  z-index: 92 !important;
+  box-shadow:
+    0 0 0 4px var(--white),
+    0 0 0 9px var(--pink),
+    7px 8px 0 var(--plum) !important;
+  animation: tour-pulse 1.7s ease-in-out infinite;
+}
+
+.tour-overlay {
+  position: fixed;
+  z-index: 75;
+  inset: 0;
+  background: rgba(31, 26, 23, 0.58);
+  pointer-events: none;
+}
+
+.tour-card {
+  position: fixed;
+  z-index: 120;
+  right: 28px;
+  bottom: 28px;
+  width: min(440px, calc(100vw - 40px));
+  border: 2px solid var(--plum);
+  border-radius: 12px;
+  background: var(--white);
+  box-shadow: 9px 10px 0 var(--plum);
+  padding: 24px;
+}
+
+.tour-card h2 {
+  margin-bottom: 10px;
+  font-size: clamp(28px, 5vw, 38px);
+}
+
+.tour-card > p:not(.eyebrow) {
+  margin-bottom: 20px;
+  color: var(--muted);
+  line-height: 1.58;
+}
+
+.tour-progress {
+  display: flex;
+  gap: 7px;
+  margin-bottom: 20px;
+}
+
+.tour-progress span {
+  width: 34px;
+  height: 6px;
+  border: 1px solid var(--plum);
+  border-radius: 999px;
+  background: transparent;
+}
+
+.tour-progress span.is-active {
+  background: var(--pink);
+}
+
+.tour-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.tour-actions .text-button {
+  margin-right: auto;
+}
+
+@keyframes tour-pulse {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
 @media (max-width: 1050px) {
   .utility-header {
     min-height: 82px;
@@ -3635,5 +3726,27 @@ h3,
   .mobile-navigation {
     right: 12px;
     left: 12px;
+  }
+
+  .tour-card {
+    right: 14px;
+    bottom: 106px;
+    width: calc(100vw - 28px);
+    padding: 20px;
+  }
+
+  .tour-actions {
+    flex-wrap: wrap;
+  }
+
+  .tour-actions .primary-button,
+  .tour-actions .secondary-button {
+    min-height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tour-highlight {
+    animation: none;
   }
 }

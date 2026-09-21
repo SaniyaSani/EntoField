@@ -2,10 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const developmentPreviewMeta =
-  /<meta(?=[^>]*\bname=["']codex-preview["'])(?=[^>]*\bcontent=["']development["'])[^>]*>/i;
-
-test("renders development preview metadata", async () => {
+test("renders the EntoField brand asset directly", async () => {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
   const { default: worker } = await import(workerUrl.href);
@@ -31,9 +28,21 @@ test("renders development preview metadata", async () => {
     /^text\/html\b/i,
   );
   const html = await response.text();
-  assert.match(html, developmentPreviewMeta);
   assert.match(html, /src="\/entofield-logo\.png"/);
   assert.doesNotMatch(html, /_next\/image[^"']*entofield-logo/);
+});
+
+test("first-launch tutorial can be replayed from Settings", async () => {
+  const [source, css] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(source, /TUTORIAL_STORAGE_KEY/);
+  assert.match(source, /Replay tutorial/);
+  assert.match(source, /Start a field trip/);
+  assert.match(css, /\.tour-card/);
+  assert.match(css, /\.tour-highlight/);
 });
 
 test("event photo picker allows the Photo Library on mobile", async () => {

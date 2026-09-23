@@ -25,3 +25,5 @@
   markers from the distributable source.
 - Changes the beige paper surfaces to clean white while keeping a very faint
   notebook grid in the main workspace.
+- Replaces the generic eyeless fly icon with the recognizable walking
+  EntoField fly: round eye, veined wings, long legs, and no trailing label.

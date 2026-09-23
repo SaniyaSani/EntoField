@@ -13,9 +13,9 @@ export const metadata: Metadata = {
     title: "EntoField",
   },
   icons: {
-    icon: "/entofield-icon-v2.png",
-    shortcut: "/entofield-icon-v2.png",
-    apple: "/entofield-icon-v2.png",
+    icon: "/entofield-icon-v3.png",
+    shortcut: "/entofield-icon-v3.png",
+    apple: "/entofield-icon-v3.png",
   },
 };
 

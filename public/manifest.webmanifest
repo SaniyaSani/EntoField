@@ -4,11 +4,11 @@
   "description": "Offline-first field notes and print-ready specimen labels",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#F4EFE4",
+  "background_color": "#FFFFFF",
   "theme_color": "#1F1A17",
   "icons": [
     {
-      "src": "/entofield-icon-v2.png",
+      "src": "/entofield-icon-v3.png",
       "sizes": "1254x1254",
       "type": "image/png",
       "purpose": "any"

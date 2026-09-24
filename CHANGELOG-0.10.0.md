@@ -27,3 +27,6 @@
   notebook grid in the main workspace.
 - Replaces the generic eyeless fly icon with the recognizable walking
   EntoField fly: round eye, veined wings, long legs, and no trailing label.
+- Refreshes locality, region, and country from imported photo GPS instead of
+  leaving a stale place name from the phone's earlier position; manual locality
+  refinements are preserved and automatic values are cleared when offline.

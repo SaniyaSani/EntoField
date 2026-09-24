@@ -45,6 +45,12 @@ import {
   downloadCsv,
   downloadXlsx,
 } from "@/lib/exports";
+import {
+  clearPreviousAutomaticPlace,
+  mergeAutomaticPlace,
+  placeFieldsFromNominatim,
+  type PlaceFields,
+} from "@/lib/reverse-geocode";
 import type {
   AppState,
   CollectingEvent,
@@ -68,6 +74,7 @@ type InstallPrompt = Event & {
 };
 
 let lastReverseGeocodeAt = 0;
+const reverseGeocodeCache = new Map<string, PlaceFields>();
 
 const navigation: Array<{
   id: ViewName;
@@ -404,6 +411,8 @@ export default function Home() {
   } | null>(null);
   const [tripLabelModal, setTripLabelModal] = useState<string | null>(null);
   const [tutorialStep, setTutorialStep] = useState<number | null>(null);
+  const automaticPlaceRef = useRef<PlaceFields | null>(null);
+  const reverseGeocodeRequestRef = useRef(0);
 
   useEffect(() => {
     let active = true;
@@ -634,6 +643,8 @@ export default function Home() {
   }
 
   function openNewEvent(fieldTripId?: string) {
+    reverseGeocodeRequestRef.current += 1;
+    automaticPlaceRef.current = null;
     setEditingEventId(null);
     setGpsStatus("idle");
     setEventDraft({
@@ -649,6 +660,8 @@ export default function Home() {
   }
 
   function openEditEvent(event: CollectingEvent) {
+    reverseGeocodeRequestRef.current += 1;
+    automaticPlaceRef.current = null;
     setEditingEventId(event.id);
     setGpsStatus(
       typeof event.latitude === "number" && typeof event.longitude === "number"
@@ -680,39 +693,71 @@ export default function Home() {
     setEventModal(true);
   }
 
-  async function reverseGeocode(latitude: number, longitude: number) {
-    if (!navigator.onLine) return;
-    const now = Date.now();
-    if (now - lastReverseGeocodeAt < 1_100) return;
-    lastReverseGeocodeAt = now;
+  async function reverseGeocode(latitude: number, longitude: number): Promise<
+    | { status: "success"; place: PlaceFields }
+    | { status: "offline" | "unavailable" | "stale" }
+  > {
+    const requestId = ++reverseGeocodeRequestRef.current;
+    if (!navigator.onLine) return { status: "offline" };
+    const cacheKey = `${latitude.toFixed(5)},${longitude.toFixed(5)}`;
+    const cached = reverseGeocodeCache.get(cacheKey);
+    if (cached) {
+      const previousAutomatic = automaticPlaceRef.current;
+      setEventDraft((draft) => {
+        if (draft.latitude !== latitude || draft.longitude !== longitude) return draft;
+        return {
+          ...draft,
+          ...mergeAutomaticPlace(draft, cached, previousAutomatic),
+        };
+      });
+      automaticPlaceRef.current = cached;
+      return { status: "success", place: cached };
+    }
+
+    const waitMs = Math.max(0, 1_100 - (Date.now() - lastReverseGeocodeAt));
+    if (waitMs) {
+      await new Promise((resolve) => window.setTimeout(resolve, waitMs));
+    }
+    if (requestId !== reverseGeocodeRequestRef.current) return { status: "stale" };
+    lastReverseGeocodeAt = Date.now();
     try {
+      const query = new URLSearchParams({
+        format: "jsonv2",
+        lat: String(latitude),
+        lon: String(longitude),
+        zoom: "18",
+        addressdetails: "1",
+        "accept-language": "en",
+      });
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&zoom=14&addressdetails=1`,
-        { headers: { "Accept-Language": "en" } },
+        `https://nominatim.openstreetmap.org/reverse?${query}`,
+        { headers: { Accept: "application/json" } },
       );
-      if (!response.ok) return;
+      if (!response.ok) return { status: "unavailable" };
       const data = await response.json();
-      const address = data.address ?? {};
+      if (requestId !== reverseGeocodeRequestRef.current) return { status: "stale" };
+      const place = placeFieldsFromNominatim(data);
+      if (!place.locality && !place.region && !place.country) {
+        return { status: "unavailable" };
+      }
+      const previousAutomatic = automaticPlaceRef.current;
       setEventDraft((draft) => ({
-        ...draft,
-        locality:
-          draft.locality ||
-          [
-            address.village ||
-              address.town ||
-              address.city ||
-              address.municipality,
-            address.road,
-          ]
-            .filter(Boolean)
-            .join(", ") ||
-          data.display_name?.split(",").slice(0, 2).join(", ") ||
-          "",
-        region: draft.region || address.state || address.county || "",
-        country: draft.country || address.country || "",
+        ...(draft.latitude === latitude && draft.longitude === longitude
+          ? {
+              ...draft,
+              ...mergeAutomaticPlace(draft, place, previousAutomatic),
+            }
+          : draft),
       }));
+      automaticPlaceRef.current = place;
+      if (reverseGeocodeCache.size >= 100) {
+        const oldestKey = reverseGeocodeCache.keys().next().value;
+        if (oldestKey) reverseGeocodeCache.delete(oldestKey);
+      }
+      reverseGeocodeCache.set(cacheKey, place);
+      return { status: "success", place };
     } catch {
-      setNotice("GPS was saved; the place name can be added manually offline.");
+      return { status: "unavailable" };
     }
   }
 
@@ -733,7 +778,7 @@ export default function Home() {
     setNotice("Finding a high-accuracy position…");
     return new Promise((resolve) => {
       navigator.geolocation.getCurrentPosition(
-        (position) => {
+        async (position) => {
           const { latitude, longitude, accuracy, altitude } = position.coords;
           setEventDraft((draft) => ({
             ...draft,
@@ -746,12 +791,19 @@ export default function Home() {
             coordinateSource: "device GPS",
           }));
           setGpsStatus("success");
-          setNotice(
+          const initialNotice =
             reason === "automatic"
               ? "GPS position added automatically."
-              : "GPS position added to the collecting event.",
-          );
-          void reverseGeocode(latitude, longitude);
+              : "GPS position added to the collecting event.";
+          setNotice(initialNotice);
+          const placeResult = await reverseGeocode(latitude, longitude);
+          if (placeResult.status === "success" && placeResult.place.locality) {
+            setNotice(`${initialNotice.slice(0, -1)} with locality ${placeResult.place.locality}.`);
+          } else if (placeResult.status === "offline") {
+            setNotice("GPS was saved; add the locality manually while offline.");
+          } else if (placeResult.status === "unavailable") {
+            setNotice("GPS was saved, but its place name could not be found. Add it manually.");
+          }
           resolve(position);
         },
         (error) => {
@@ -797,9 +849,19 @@ export default function Home() {
       const hasCurrentGps =
         typeof eventDraft.latitude === "number" &&
         typeof eventDraft.longitude === "number";
+      const previousAutomaticPlace = hasPhotoGps
+        ? automaticPlaceRef.current
+        : null;
+      if (hasPhotoGps) {
+        reverseGeocodeRequestRef.current += 1;
+        automaticPlaceRef.current = null;
+      }
 
       setEventDraft((draft) => {
-        const next = { ...draft };
+        const placeFields = hasPhotoGps
+          ? clearPreviousAutomaticPlace(draft, previousAutomaticPlace)
+          : draft;
+        const next = { ...draft, ...placeFields };
         if (hasCapturedAt) {
           const local = new Date(
             captured.getTime() - captured.getTimezoneOffset() * 60_000,
@@ -823,12 +885,27 @@ export default function Home() {
 
       if (hasPhotoGps) {
         setGpsStatus("success");
-        setNotice(
-          hasCapturedAt
-            ? "Photo GPS and capture time were added automatically."
-            : "Photo GPS was added automatically. Its capture time was unavailable.",
-        );
-        void reverseGeocode(latitude, longitude);
+        setNotice("Reading locality from the photo GPS…");
+        const placeResult = await reverseGeocode(latitude, longitude);
+        if (placeResult.status === "success") {
+          setNotice(
+            hasCapturedAt
+              ? `Photo GPS, capture time, and locality ${placeResult.place.locality} were added automatically.`
+              : `Photo GPS and locality ${placeResult.place.locality} were added automatically. Its capture time was unavailable.`,
+          );
+        } else if (placeResult.status === "offline") {
+          setNotice(
+            hasCapturedAt
+              ? "Photo GPS and capture time were added. The previous automatic locality was cleared; add the place manually while offline."
+              : "Photo GPS was added. The previous automatic locality was cleared; add the place manually while offline.",
+          );
+        } else if (placeResult.status === "unavailable") {
+          setNotice(
+            hasCapturedAt
+              ? "Photo GPS and capture time were added. The previous automatic locality was cleared because a new place name could not be found."
+              : "Photo GPS was added. The previous automatic locality was cleared because a new place name could not be found.",
+          );
+        }
       } else if (hasCurrentGps) {
         setNotice(
           hasCapturedAt

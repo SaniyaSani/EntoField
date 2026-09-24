@@ -1,4 +1,4 @@
-const CACHE_NAME = "entofield-v8-eyed-fly";
+const CACHE_NAME = "entofield-v9-photo-locality";
 const APP_SHELL = [
   "/",
   "/manifest.webmanifest",

@@ -1788,6 +1788,12 @@ h2 {
   margin-bottom: 16px;
 }
 
+.label-copy-hint {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .trip-label-selection {
   margin-top: 19px;
 }

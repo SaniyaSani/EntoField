@@ -78,14 +78,16 @@ test("label studio exposes both label types and an exact PDF preview", async () 
 });
 
 test("copy-count fields can be cleared before a replacement number is typed", async () => {
-  const [labelStudio, page] = await Promise.all([
-    readFile(new URL("../app/label-studio.tsx", import.meta.url), "utf8"),
+  const [copyInput, page] = await Promise.all([
+    readFile(new URL("../app/copy-count-input.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
   ]);
 
-  assert.match(labelStudio, /value=\{copiesByEvent\[event\.id\] \|\| ""\}/);
-  assert.match(labelStudio, /value === 0 \? 0/);
-  assert.match(labelStudio, /onBlur=\{\(\) => commitCopies\(event\.id\)\}/);
+  assert.match(copyInput, /value=\{editing \? draft : String\(value\)\}/);
+  assert.match(copyInput, /onChange=\{\(event\) => setDraft/);
+  assert.match(copyInput, /onCommit\(normalizeLabelCopies\(event.currentTarget.value\)\)/);
+  assert.match(copyInput, /inputMode="numeric"/);
+  assert.match(copyInput, /event.currentTarget.blur\(\)/);
   assert.match(page, /value=\{bulkCount \|\| ""\}/);
   assert.match(page, /value=\{draft\.quantity \|\| ""\}/);
 });

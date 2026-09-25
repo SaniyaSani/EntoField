@@ -82,6 +82,7 @@ test("formats compact collection metadata with Unicode locality", () => {
   assert.equal(formatCollectionDate(event.date, "roman"), "31.VIII.2026");
   const lines = buildCollectionLabelLines(event, event.id, {
     includeCoordinates: true,
+    includeAltitude: true,
     coordinateFormat: "wgs84",
     shortenCollectorNames: true,
     dateFormat: "roman",
@@ -112,11 +113,38 @@ test("formats WGS84, modern LV95 and legacy LV03 coordinates", () => {
 test("prints the selected Swiss grid on a collection label", () => {
   const lines = buildCollectionLabelLines(event, event.id, {
     includeCoordinates: true,
+    includeAltitude: true,
     coordinateFormat: "lv95",
     shortenCollectorNames: true,
     dateFormat: "roman",
   });
   assert.equal(lines[1].text, "LV95 E 2'694'902 / N 1'233'190");
+});
+
+test("coordinates and altitude can be printed independently in every coordinate format", () => {
+  for (const coordinateFormat of ["wgs84", "lv95", "lv03"]) {
+    for (const includeCoordinates of [true, false]) {
+      for (const includeAltitude of [true, false]) {
+        const text = buildCollectionLabelLines(event, "", {
+          includeCoordinates, includeAltitude, coordinateFormat,
+          shortenCollectorNames: true, dateFormat: "roman",
+        }).map((line) => line.text).join("\n");
+        assert.equal(text.includes(formatCoordinatesForLabel(event.latitude, event.longitude, coordinateFormat)), includeCoordinates);
+        assert.equal(text.includes("430 m"), includeAltitude);
+        assert.ok(text.includes("31.VIII.2026"));
+        assert.ok(text.includes("Üetiker Ried"));
+        assert.equal(text.includes(event.id), false);
+      }
+    }
+  }
+});
+
+test("altitude zero is retained independently of missing coordinates", () => {
+  const lines = buildCollectionLabelLines({ ...event, altitude: 0, latitude: undefined, longitude: undefined }, "", {
+    includeCoordinates: false, includeAltitude: true, coordinateFormat: "wgs84",
+    shortenCollectorNames: true, dateFormat: "roman",
+  });
+  assert.ok(lines.some((line) => line.text.startsWith("0 m ·")));
 });
 
 test("creates one collection label per record, including one for a lot", () => {
@@ -128,6 +156,7 @@ test("creates one collection label per record, including one for a lot", () => {
     includeIdentifier: true,
     options: {
       includeCoordinates: true,
+      includeAltitude: true,
       coordinateFormat: "wgs84",
       shortenCollectorNames: true,
       dateFormat: "roman",
@@ -147,6 +176,7 @@ test("combines selected collecting events without inserting page breaks", () => 
     includeIdentifier: true,
     options: {
       includeCoordinates: true,
+      includeAltitude: true,
       coordinateFormat: "wgs84",
       shortenCollectorNames: true,
       dateFormat: "roman",
@@ -190,6 +220,7 @@ test("groups label types or keeps matching record labels together", () => {
     includeIdentifier: true,
     options: {
       includeCoordinates: true,
+      includeAltitude: true,
       coordinateFormat: "wgs84",
       shortenCollectorNames: true,
       dateFormat: "roman",
@@ -247,6 +278,7 @@ test("creates a readable A4 PDF with embedded Unicode fonts", async () => {
       includeIdentifier: true,
       options: {
         includeCoordinates: true,
+        includeAltitude: true,
         coordinateFormat: "wgs84",
         shortenCollectorNames: true,
         dateFormat: "roman",
@@ -273,6 +305,7 @@ test("creates a readable A4 PDF with embedded Unicode fonts", async () => {
       includeIdentifier: true,
       options: {
         includeCoordinates: true,
+        includeAltitude: true,
         coordinateFormat: "lv95",
         shortenCollectorNames: true,
         dateFormat: "roman",

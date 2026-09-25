@@ -32,6 +32,7 @@ export type CoordinateFormat = "wgs84" | "lv95" | "lv03";
 
 export type CollectionLabelOptions = {
   includeCoordinates: boolean;
+  includeAltitude: boolean;
   coordinateFormat: CoordinateFormat;
   shortenCollectorNames: boolean;
   dateFormat: "roman" | "slash" | "iso";
@@ -239,7 +240,7 @@ export function buildCollectionLabelLines(
   }
 
   const altitude =
-    options.includeCoordinates && typeof event.altitude === "number"
+    options.includeAltitude && typeof event.altitude === "number"
       ? `${Math.round(event.altitude)} m`
       : "";
   const date = formatCollectionDate(event.date, options.dateFormat);

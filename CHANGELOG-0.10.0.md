@@ -30,3 +30,9 @@
 - Refreshes locality, region, and country from imported photo GPS instead of
   leaving a stale place name from the phone's earlier position; manual locality
   refinements are preserved and automatic values are cleared when offline.
+- Defaults collection labels to Copies per event with collecting-event IDs off.
+- Separates Print coordinates and Print altitude into independent options.
+- Applies copy counts after editing, generates PDFs in a background worker,
+  and reuses text layout for identical copies to keep mobile typing responsive.
+- Only downloads the PDF for the current settings, preventing stale preview
+  bytes from being downloaded while a new count or option is being processed.

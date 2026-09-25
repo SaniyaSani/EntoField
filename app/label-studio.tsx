@@ -2,6 +2,13 @@
 
 import { Bug, Download, FileSpreadsheet, MapPin, Package, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { CopyCountInput } from "@/app/copy-count-input";
+import {
+  DEFAULT_COLLECTION_SOURCE,
+  DEFAULT_INCLUDE_COLLECTION_IDENTIFIER,
+  normalizeLabelCopies,
+} from "@/lib/label-studio-options";
+import type { LabelPdfRequest, LabelPdfResponse } from "@/lib/labels-pdf.worker";
 import {
   arrangeLabelJobs,
   DEFAULT_COLLECTION_LABEL_SETTINGS,
@@ -69,15 +76,17 @@ export function LabelStudio({
   const [mode, setMode] = useState<LabelMode>(initialMode);
   const [selectedIds, setSelectedIds] = useState(() => new Set(orderedEvents.map((event) => event.id)));
   const [source, setSource] = useState<"quick" | "records">(
-    initialMode === "both" && records.length ? "records" : "quick",
+    DEFAULT_COLLECTION_SOURCE,
   );
   const [copiesByEvent, setCopiesByEvent] = useState<Record<string, number>>(() =>
     Object.fromEntries(
-      orderedEvents.map((event) => [event.id, Math.max(1, recordsByEvent.get(event.id)?.length ?? 0)]),
+      orderedEvents.map((event) => [event.id, normalizeLabelCopies(recordsByEvent.get(event.id)?.length ?? 0)]),
     ),
   );
-  const [includeIdentifier, setIncludeIdentifier] = useState(true);
+  const [copiesEditing, setCopiesEditing] = useState(false);
+  const [includeIdentifier, setIncludeIdentifier] = useState(DEFAULT_INCLUDE_COLLECTION_IDENTIFIER);
   const [includeCoordinates, setIncludeCoordinates] = useState(true);
+  const [includeAltitude, setIncludeAltitude] = useState(true);
   const [coordinateFormat, setCoordinateFormat] = useState<CoordinateFormat>("wgs84");
   const [shortenCollectorNames, setShortenCollectorNames] = useState(true);
   const [dateFormat, setDateFormat] = useState<CollectionLabelOptions["dateFormat"]>("roman");
@@ -89,11 +98,17 @@ export function LabelStudio({
   const [arrangement, setArrangement] = useState<LabelArrangement>(DEFAULT_LABEL_PAGE_OPTIONS.arrangement);
   const [cuttingGuideStyle, setCuttingGuideStyle] = useState<CuttingGuideStyle>(DEFAULT_LABEL_PAGE_OPTIONS.cuttingGuideStyle);
   const [cuttingGapMm, setCuttingGapMm] = useState(DEFAULT_LABEL_PAGE_OPTIONS.cuttingGapMm);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [previewBytes, setPreviewBytes] = useState<Uint8Array | null>(null);
-  const [previewBusy, setPreviewBusy] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [preview, setPreview] = useState<{
+    request: LabelPdfRequest;
+    url: string;
+    bytes: Uint8Array;
+    overflowCount: number;
+  } | null>(null);
+  const [previewError, setPreviewError] = useState<{
+    request: LabelPdfRequest;
+    message: string;
+  } | null>(null);
+  const [previewAttempt, setPreviewAttempt] = useState(0);
 
   const selectedEvents = useMemo(
     () => orderedEvents.filter((event) => selectedIds.has(event.id)),
@@ -107,8 +122,8 @@ export function LabelStudio({
   const totalRecorded = selectedRecords.length;
 
   const collectionOptions = useMemo<CollectionLabelOptions>(
-    () => ({ includeCoordinates, coordinateFormat, shortenCollectorNames, dateFormat }),
-    [includeCoordinates, coordinateFormat, shortenCollectorNames, dateFormat],
+    () => ({ includeCoordinates, includeAltitude, coordinateFormat, shortenCollectorNames, dateFormat }),
+    [includeCoordinates, includeAltitude, coordinateFormat, shortenCollectorNames, dateFormat],
   );
   const collectionJobs = useMemo(
     () =>
@@ -146,51 +161,56 @@ export function LabelStudio({
     [effectiveArrangement, cuttingGuideStyle, cuttingGapMm],
   );
   const pdfTitle = `${modeTitle(mode)} · ${scopeName}`;
+  const pdfRequest = useMemo<LabelPdfRequest>(
+    () => ({ jobs, title: pdfTitle, options: pageOptions }),
+    [jobs, pdfTitle, pageOptions],
+  );
+  const previewIsCurrent = preview?.request === pdfRequest;
+  const error = previewError?.request === pdfRequest ? previewError.message : null;
+  const previewBusy = Boolean(jobs.length && !previewIsCurrent && !error);
 
   useEffect(() => {
+    // Do not reload the PDF viewer while the mobile keyboard is open.
+    if (copiesEditing || !jobs.length) return;
     let active = true;
-    let nextUrl: string | null = null;
+    let worker: Worker | undefined;
+    const fail = (message: string) => {
+      if (active) setPreviewError({ request: pdfRequest, message });
+      worker?.terminate();
+    };
     const timer = window.setTimeout(() => {
-      if (!jobs.length) {
-        setPreviewBytes(null);
-        setPreviewUrl((current) => {
-          if (current) URL.revokeObjectURL(current);
-          return null;
-        });
-        setPreviewBusy(false);
-        return;
+      try {
+        worker = new Worker(new URL("../lib/labels-pdf.worker.ts", import.meta.url), { type: "module" });
+        worker.onmessage = (event: MessageEvent<LabelPdfResponse>) => {
+          if (!active) return;
+          if ("error" in event.data) return fail(event.data.error);
+          const { bytes, overflowCount } = event.data.result;
+          const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: "application/pdf" }));
+          setPreview({ request: pdfRequest, bytes, overflowCount, url });
+          setPreviewError(null);
+          worker?.terminate();
+        };
+        worker.onerror = () => fail("The PDF preview could not be created. Please retry.");
+        worker.onmessageerror = () => fail("The PDF preview could not be read. Please retry.");
+        worker.postMessage(pdfRequest);
+      } catch (caught) {
+        fail(caught instanceof Error ? caught.message : "The PDF preview could not be created.");
       }
-      setPreviewBytes(null);
-      setPreviewBusy(true);
-      import("@/lib/labels-pdf")
-        .then(({ createLabelsPdf }) => createLabelsPdf(jobs, pdfTitle, pageOptions))
-        .then(({ bytes }) => {
-          if (!active) return;
-          nextUrl = URL.createObjectURL(new Blob([bytes as BlobPart], { type: "application/pdf" }));
-          setPreviewUrl((current) => {
-            if (current) URL.revokeObjectURL(current);
-            return nextUrl;
-          });
-          setPreviewBytes(bytes);
-          setError(null);
-        })
-        .catch((caught) => {
-          if (!active) return;
-          setError(caught instanceof Error ? caught.message : "The PDF preview could not be created on this device.");
-        })
-        .finally(() => active && setPreviewBusy(false));
-    }, jobs.length ? 220 : 0);
+    }, 300);
 
     return () => {
       active = false;
       window.clearTimeout(timer);
-      if (nextUrl) URL.revokeObjectURL(nextUrl);
+      worker?.terminate();
     };
-  }, [jobs, pageOptions, pdfTitle]);
+  }, [jobs.length, pdfRequest, copiesEditing, previewAttempt]);
+
+  useEffect(() => {
+    return () => { if (preview) URL.revokeObjectURL(preview.url); };
+  }, [preview]);
 
   function chooseMode(nextMode: LabelMode) {
     setMode(nextMode);
-    if (nextMode === "both" && totalRecorded) setSource("records");
   }
 
   function toggleEvent(id: string) {
@@ -203,39 +223,24 @@ export function LabelStudio({
   }
 
   function setCopies(id: string, value: number) {
-    if (!Number.isFinite(value) || value < 0) return;
-    const safeValue = value === 0 ? 0 : Math.min(200, Math.floor(value));
-    setCopiesByEvent((current) => ({ ...current, [id]: safeValue }));
+    setCopiesByEvent((current) => current[id] === value ? current : { ...current, [id]: value });
   }
 
-  function commitCopies(id: string) {
-    if ((copiesByEvent[id] ?? 0) < 1) setCopies(id, 1);
-  }
-
-  async function createPdf() {
-    if (!jobs.length) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const { createLabelsPdf, downloadPdf } = await import("@/lib/labels-pdf");
-      const result = previewBytes
-        ? { bytes: previewBytes, overflowCount: 0 }
-        : await createLabelsPdf(jobs, pdfTitle, pageOptions);
-      downloadPdf(
-        result.bytes,
-        `${mode === "both" ? "Combined" : modeTitle(mode).split(" ")[0]}_labels_${safeFilePart(scopeId)}.pdf`,
-      );
-      onNotice(
-        result.overflowCount
-          ? `${jobs.length} labels downloaded. ${result.overflowCount} need a larger size or shorter text.`
-          : `${jobs.length} labels downloaded in the same A4 layout shown in the preview.`,
-      );
-      onClose();
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "The PDF could not be created on this device.");
-    } finally {
-      setBusy(false);
-    }
+  function createPdf() {
+    if (!jobs.length || copiesEditing || !previewIsCurrent || !preview) return;
+    // Download the verified current preview, never bytes from an earlier count/option.
+    const url = URL.createObjectURL(new Blob([preview.bytes as BlobPart], { type: "application/pdf" }));
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${mode === "both" ? "Combined" : modeTitle(mode).split(" ")[0]}_labels_${safeFilePart(scopeId)}.pdf`;
+    anchor.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+    onNotice(
+      preview.overflowCount
+        ? `${jobs.length} labels downloaded. ${preview.overflowCount} need a larger size or shorter text.`
+        : `${jobs.length} labels downloaded in the same A4 layout shown in the preview.`,
+    );
+    onClose();
   }
 
   return (
@@ -293,15 +298,11 @@ export function LabelStudio({
                     {mode !== "determination" && source === "quick" ? (
                       <label className="field trip-label-copies">
                         <span>Copies</span>
-                        <input
-                          type="number"
-                          min="1"
-                          max="200"
-                          value={copiesByEvent[event.id] || ""}
+                        <CopyCountInput
+                          value={copiesByEvent[event.id]}
                           disabled={!selected}
-                          onFocus={(input) => input.currentTarget.select()}
-                          onChange={(input) => setCopies(event.id, Number(input.target.value))}
-                          onBlur={() => commitCopies(event.id)}
+                          onCommit={(value) => setCopies(event.id, value)}
+                          onEditingChange={setCopiesEditing}
                         />
                       </label>
                     ) : (
@@ -325,18 +326,15 @@ export function LabelStudio({
                 <div><strong>Identical locality labels</strong><span>Useful before the specimens or lots have been entered.</span></div>
                 <label className="field">
                   <span>Copies</span>
-                  <input
-                    type="number"
-                    min="1"
-                    max="200"
-                    value={copiesByEvent[orderedEvents[0].id] || ""}
-                    onFocus={(input) => input.currentTarget.select()}
-                    onChange={(input) => setCopies(orderedEvents[0].id, Number(input.target.value))}
-                    onBlur={() => commitCopies(orderedEvents[0].id)}
+                  <CopyCountInput
+                    value={copiesByEvent[orderedEvents[0].id]}
+                    onCommit={(value) => setCopies(orderedEvents[0].id, value)}
+                    onEditingChange={setCopiesEditing}
                   />
                 </label>
               </div>
             )}
+            {source === "quick" && <p className="label-copy-hint">1–200 copies per event. Tap Done or leave the field to update the preview.</p>}
             <label className="checkbox-row label-checkbox">
               <input type="checkbox" checked={includeIdentifier} onChange={(input) => setIncludeIdentifier(input.target.checked)} />
               {source === "quick" ? "Include collecting event IDs" : "Include specimen or lot IDs"}
@@ -388,10 +386,13 @@ export function LabelStudio({
         <div className="label-preview-section exact-pdf-preview">
           <div className="label-section-heading">
             <div><p className="eyebrow">Exact A4 preview</p><h3>The download uses this same PDF</h3></div>
-            <span>{previewBusy ? "Updating…" : "Ready"}</span>
+            <span role="status">{copiesEditing ? "Finish editing copies…" : error ? "Preview unavailable" : previewBusy ? "Updating…" : jobs.length ? "Ready" : "No labels"}</span>
           </div>
-          {previewUrl ? (
-            <iframe className="label-pdf-frame" src={previewUrl} title="Exact A4 label PDF preview" />
+          {preview && jobs.length ? (
+            <>
+              {!previewIsCurrent && <p className="label-copy-hint">Previous preview — updating to your current settings.</p>}
+              <iframe className="label-pdf-frame" src={preview.url} title="Exact A4 label PDF preview" />
+            </>
           ) : (
             <div className="label-preview-empty">{jobs.length ? "Preparing the print preview…" : "No labels match the current selection."}</div>
           )}
@@ -411,7 +412,8 @@ export function LabelStudio({
                 <option value="wgs84">WGS84 latitude / longitude</option><option value="lv95">Swiss LV95</option><option value="lv03">Swiss LV03</option>
               </select>
             </label>
-            <label className="checkbox-row label-checkbox settings-checkbox span-2"><input type="checkbox" checked={includeCoordinates} onChange={(input) => setIncludeCoordinates(input.target.checked)} />Print coordinates and altitude</label>
+            <label className="checkbox-row label-checkbox settings-checkbox span-2"><input type="checkbox" checked={includeCoordinates} onChange={(input) => setIncludeCoordinates(input.target.checked)} />Print coordinates</label>
+            <label className="checkbox-row label-checkbox settings-checkbox span-2"><input type="checkbox" checked={includeAltitude} onChange={(input) => setIncludeAltitude(input.target.checked)} />Print altitude</label>
             <label className="checkbox-row label-checkbox settings-checkbox span-2"><input type="checkbox" checked={shortenCollectorNames} onChange={(input) => setShortenCollectorNames(input.target.checked)} />Shorten collector first names</label>
           </LabelSettingsPanel>
         )}
@@ -427,11 +429,11 @@ export function LabelStudio({
           </LabelSettingsPanel>
         )}
 
-        {error && <p className="label-error">{error}</p>}
+        {error && <div className="label-error"><p>{error}</p><button type="button" className="secondary-button" onClick={() => { setPreviewError(null); setPreviewAttempt((attempt) => attempt + 1); }}>Retry preview</button></div>}
         <div className="modal-actions">
           <button type="button" className="secondary-button" onClick={onClose}>Cancel</button>
-          <button type="button" className="primary-button" disabled={!jobs.length || busy || previewBusy} onClick={() => void createPdf()}>
-            <Download aria-hidden="true" />{busy ? "Creating PDF…" : `Download ${jobs.length} labels`}
+          <button type="button" className="primary-button" disabled={!jobs.length || copiesEditing || !previewIsCurrent || Boolean(error)} onClick={createPdf}>
+            <Download aria-hidden="true" />{`Download ${jobs.length} labels`}
           </button>
         </div>
       </div>

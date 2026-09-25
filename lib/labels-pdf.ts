@@ -153,18 +153,18 @@ function drawLabel(
   x: number,
   y: number,
   drawBorder: boolean,
+  preparedCache: Map<string, ReturnType<typeof prepareLabel>>,
 ): boolean {
   const width = job.settings.widthMm * POINTS_PER_MM;
   const height = job.settings.heightMm * POINTS_PER_MM;
   const availableWidth = width - 2 * INNER_PADDING;
   const availableHeight = height - 2 * INNER_PADDING;
-  const prepared = prepareLabel(
-    job.lines,
-    job.settings,
-    fonts,
-    availableWidth,
-    availableHeight,
-  );
+  const cacheKey = JSON.stringify([job.lines, job.settings]);
+  let prepared = preparedCache.get(cacheKey);
+  if (!prepared) {
+    prepared = prepareLabel(job.lines, job.settings, fonts, availableWidth, availableHeight);
+    preparedCache.set(cacheKey, prepared);
+  }
 
   if (drawBorder) {
     page.drawRectangle({
@@ -230,6 +230,7 @@ export async function createLabelsPdf(
       ? Math.max(0, options.cuttingGapMm) * POINTS_PER_MM
       : 0;
   const drawBorder = options.cuttingGuideStyle !== "none";
+  const preparedCache = new Map<string, ReturnType<typeof prepareLabel>>();
 
   for (const job of jobs) {
     const width = job.settings.widthMm * POINTS_PER_MM;
@@ -254,7 +255,7 @@ export async function createLabelsPdf(
       top = A4_HEIGHT - PAGE_MARGIN;
       rowHeight = 0;
     }
-    if (!drawLabel(page, job, fonts, x, top - height, drawBorder)) {
+    if (!drawLabel(page, job, fonts, x, top - height, drawBorder, preparedCache)) {
       overflowCount += 1;
     }
     x += width + gap;

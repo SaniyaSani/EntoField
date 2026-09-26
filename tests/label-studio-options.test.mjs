@@ -14,7 +14,8 @@ test("collection defaults are copies per event without event identifiers", () =>
 });
 
 test("copy counts are normalized only when committed", () => {
-  for (const [input, expected] of [["", 1], ["0", 1], ["1", 1], ["50", 50], ["150", 150], ["200", 200], ["999", MAX_LABEL_COPIES], ["0050", 50], ["invalid", 1], [Infinity, 1], [-3, 1], [1.9, 1]]) {
+  assert.equal(MAX_LABEL_COPIES, 2000);
+  for (const [input, expected] of [["", 1], ["0", 1], ["1", 1], ["50", 50], ["150", 150], ["200", 200], ["252", 252], ["504", 504], ["999", 999], ["2000", 2000], ["2001", MAX_LABEL_COPIES], ["999999", MAX_LABEL_COPIES], ["0050", 50], ["invalid", 1], [Infinity, 1], [-3, 1], [1.9, 1]]) {
     assert.equal(normalizeLabelCopies(input), expected);
   }
 });

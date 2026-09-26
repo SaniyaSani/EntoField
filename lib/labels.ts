@@ -1,4 +1,5 @@
 import type { CollectingEvent, SpecimenRecord } from "./types";
+import { normalizeLabelCopies } from "./label-studio-options.ts";
 
 export type LabelLineStyle = "regular" | "bold" | "italic";
 
@@ -311,7 +312,7 @@ export function makeCollectionLabelJobs({
     }));
   }
 
-  const safeCopies = Math.max(1, Math.min(200, Math.floor(copies || 1)));
+  const safeCopies = normalizeLabelCopies(copies);
   return Array.from({ length: safeCopies }, (_, index) => ({
     kind: "collection" as const,
     sourceKey: `${event.id}:copy:${index + 1}`,

@@ -31,6 +31,8 @@
   leaving a stale place name from the phone's earlier position; manual locality
   refinements are preserved and automatic values are cleared when offline.
 - Defaults collection labels to Copies per event with collecting-event IDs off.
+- Raises the copy limit to 2,000 per event, with one shared limit for input and
+  PDF generation, allowing full sheets and larger print batches.
 - Separates Print coordinates and Print altitude into independent options.
 - Applies copy counts after editing, generates PDFs in a background worker,
   and reuses text layout for identical copies to keep mobile typing responsive.

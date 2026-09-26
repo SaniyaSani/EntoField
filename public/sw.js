@@ -1,4 +1,4 @@
-const CACHE_NAME = "entofield-v10-responsive-labels";
+const CACHE_NAME = "entofield-v11-larger-label-batches";
 const APP_SHELL = [
   "/",
   "/manifest.webmanifest",

@@ -6,6 +6,7 @@ import { CopyCountInput } from "@/app/copy-count-input";
 import {
   DEFAULT_COLLECTION_SOURCE,
   DEFAULT_INCLUDE_COLLECTION_IDENTIFIER,
+  MAX_LABEL_COPIES,
   normalizeLabelCopies,
 } from "@/lib/label-studio-options";
 import type { LabelPdfRequest, LabelPdfResponse } from "@/lib/labels-pdf.worker";
@@ -334,7 +335,7 @@ export function LabelStudio({
                 </label>
               </div>
             )}
-            {source === "quick" && <p className="label-copy-hint">1–200 copies per event. Tap Done or leave the field to update the preview.</p>}
+            {source === "quick" && <p className="label-copy-hint">1–{MAX_LABEL_COPIES.toLocaleString("en-US")} copies per event. Tap Done or leave the field to update the preview.</p>}
             <label className="checkbox-row label-checkbox">
               <input type="checkbox" checked={includeIdentifier} onChange={(input) => setIncludeIdentifier(input.target.checked)} />
               {source === "quick" ? "Include collecting event IDs" : "Include specimen or lot IDs"}

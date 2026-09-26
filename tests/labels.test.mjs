@@ -167,6 +167,17 @@ test("creates one collection label per record, including one for a lot", () => {
   assert.match(jobs[1].lines[0].text, /-L01/);
 });
 
+test("collection jobs accept full-sheet counts and cap each event at 2000", () => {
+  for (const [copies, expected] of [[252, 252], [504, 504], [2000, 2000], [2001, 2000]]) {
+    const jobs = makeCollectionLabelJobs({
+      event, records: [], source: "quick", copies, includeIdentifier: false,
+      options: { includeCoordinates: true, includeAltitude: false, coordinateFormat: "wgs84", shortenCollectorNames: true, dateFormat: "roman" },
+      settings: DEFAULT_COLLECTION_LABEL_SETTINGS,
+    });
+    assert.equal(jobs.length, expected);
+  }
+});
+
 test("combines selected collecting events without inserting page breaks", () => {
   const jobs = makeMultiEventCollectionLabelJobs({
     events: [event, secondEvent],

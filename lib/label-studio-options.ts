@@ -1,6 +1,6 @@
 export const DEFAULT_COLLECTION_SOURCE = "quick" as const;
 export const DEFAULT_INCLUDE_COLLECTION_IDENTIFIER = false;
-export const MAX_LABEL_COPIES = 200;
+export const MAX_LABEL_COPIES = 2_000;
 
 /** Normalize only on commit, never while the user is replacing the number. */
 export function normalizeLabelCopies(value: string | number): number {
